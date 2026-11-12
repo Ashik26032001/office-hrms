@@ -44,6 +44,7 @@ OFFICE_GEOFENCE_RADIUS_METRES = int(os.environ.get('GEO_RADIUS', '300'))
 CSRF_TRUSTED_ORIGINS = [
     'https://*.railway.app',
     'https://*.up.railway.app',
+    'https://office-hrms-production.up.railway.app',
     'https://*.onrender.com',
 ]
 
