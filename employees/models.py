@@ -67,6 +67,8 @@ class Employee(models.Model):
     webauthn_public_key    = models.TextField(blank=True, null=True)
     webauthn_sign_count    = models.BigIntegerField(default=0)
     webauthn_enrolled      = models.BooleanField(default=False)
+    # Max fingers allowed (admin sets this per employee, default 3)
+    max_fingers_allowed    = models.IntegerField(default=3)
 
     def generate_qr(self):
         """Generate QR code image containing the secure token."""
@@ -100,3 +102,41 @@ class Employee(models.Model):
 
     class Meta:
         ordering = ['employee_id']
+
+
+class FingerCredential(models.Model):
+    """
+    Stores one WebAuthn credential per finger.
+    Each employee can have up to max_fingers_allowed credentials.
+    Admin can delete/reset individual fingers.
+    """
+    FINGER_CHOICES = [
+        ('right_thumb',  'Right Thumb'),
+        ('right_index',  'Right Index'),
+        ('right_middle', 'Right Middle'),
+        ('left_thumb',   'Left Thumb'),
+        ('left_index',   'Left Index'),
+        ('left_middle',  'Left Middle'),
+        ('any',          'Any Finger'),
+    ]
+
+    employee       = models.ForeignKey(
+        Employee, on_delete=models.CASCADE, related_name='finger_credentials'
+    )
+    finger_label   = models.CharField(
+        max_length=20, choices=FINGER_CHOICES, default='any'
+    )
+    credential_id  = models.TextField(unique=True)
+    public_key     = models.TextField()
+    sign_count     = models.BigIntegerField(default=0)
+    device_info    = models.CharField(max_length=200, blank=True,
+                                       help_text='e.g. iPhone 14, Samsung Galaxy')
+    enrolled_at    = models.DateTimeField(auto_now_add=True)
+    last_used_at   = models.DateTimeField(null=True, blank=True)
+    is_active      = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['enrolled_at']
+
+    def __str__(self):
+        return f"{self.employee.employee_id} — {self.get_finger_label_display()}"

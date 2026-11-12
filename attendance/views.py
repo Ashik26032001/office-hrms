@@ -167,11 +167,14 @@ def fingerprint_scan_api(request):
 
 @hr_required
 def webauthn_register_options(request, pk):
-    """Return registration options so employee can enroll fingerprint."""
+    """Return registration options so employee can enroll one finger."""
     try:
-        employee = get_object_or_404(Employee, pk=pk)
-        options  = get_registration_options(employee)
+        employee     = get_object_or_404(Employee, pk=pk)
+        finger_label = request.GET.get('finger', 'any')
+        options      = get_registration_options(employee, finger_label)
         return JsonResponse({'success': True, 'options': options})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
@@ -179,11 +182,13 @@ def webauthn_register_options(request, pk):
 @require_POST
 @hr_required
 def webauthn_register_verify(request, pk):
-    """Verify registration credential and save to employee."""
+    """Verify registration credential and save finger."""
     try:
-        employee   = get_object_or_404(Employee, pk=pk)
-        credential = json.loads(request.body)
-        ok, msg    = verify_registration(employee, credential)
+        employee     = get_object_or_404(Employee, pk=pk)
+        body         = json.loads(request.body)
+        finger_label = body.get('finger_label', 'any')
+        device_info  = body.get('device_info', '')
+        ok, msg      = verify_registration(employee, body, finger_label, device_info)
         if ok:
             return JsonResponse({'success': True, 'message': msg})
         return JsonResponse({'success': False, 'message': msg}, status=400)

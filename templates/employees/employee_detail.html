@@ -121,11 +121,16 @@
                         </div>
                     </div>
                     {% if emp.webauthn_enrolled %}
-                    <span class="badge bg-success">Enrolled</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-success">Enrolled</span>
+                        <a href="{% url 'finger_management' emp.pk %}" class="btn btn-sm btn-outline-primary">
+                            Manage Fingers
+                        </a>
+                    </div>
                     {% else %}
-                    <button class="btn btn-sm btn-warning" onclick="enrollFingerprint({{ emp.pk }})">
+                    <a href="{% url 'finger_management' emp.pk %}" class="btn btn-sm btn-warning">
                         Enroll
-                    </button>
+                    </a>
                     {% endif %}
                 </div>
             </div>

@@ -1,44 +1,17 @@
 """
-WebAuthn service for fingerprint / Face ID / device biometrics.
-
-WebAuthn is the W3C standard built into all modern browsers and OS.
-No USB fingerprint scanner needed — it uses:
-  • Windows Hello (fingerprint / face / PIN)
-  • Android fingerprint / face unlock
-  • Apple Touch ID / Face ID
-  • Any FIDO2 security key
-
-Flow:
-  REGISTRATION (one-time setup per employee):
-    1. HR opens employee's enrollment page
-    2. Browser asks employee to scan fingerprint
-    3. Device generates a credential (public/private key pair)
-    4. Public key stored in Employee model
-    5. Private key NEVER leaves the device
-
-  AUTHENTICATION (daily attendance):
-    1. Employee taps "Fingerprint Scan" button on scanner page
-    2. Browser asks employee to scan fingerprint
-    3. Device signs a challenge with the private key
-    4. Django verifies the signature using stored public key
-    5. Attendance recorded
-
-Security: The private key never leaves the device.
-Even if the database is stolen, attackers cannot use it.
+WebAuthn service — supports multiple finger credentials per employee.
+Each employee can enroll up to max_fingers_allowed fingers (default 3).
+Admin controls max_fingers_allowed per employee.
 """
-import os
 import base64
 import json
 import secrets
-import hashlib
 import struct
 import logging
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-
-# ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 def b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
@@ -52,73 +25,85 @@ def b64url_decode(s: str) -> bytes:
 
 
 def generate_challenge() -> str:
-    """Generate a cryptographically secure random challenge (32 bytes, base64url)."""
     return b64url_encode(secrets.token_bytes(32))
 
 
 # ─── REGISTRATION ─────────────────────────────────────────────────────────────
 
-def get_registration_options(employee):
+def get_registration_options(employee, finger_label='any'):
     """
-    Build WebAuthn PublicKeyCredentialCreationOptions to send to the browser.
-    The browser uses this to ask the device for a new biometric credential.
+    Build registration options for one finger.
+    Returns error if employee already has max fingers enrolled.
     """
+    from employees.models import FingerCredential
+    from attendance.models import WebAuthnChallenge
+
+    # Check finger limit
+    current_count = FingerCredential.objects.filter(
+        employee=employee, is_active=True
+    ).count()
+
+    if current_count >= employee.max_fingers_allowed:
+        raise ValueError(
+            f"Maximum {employee.max_fingers_allowed} finger(s) already enrolled. "
+            f"Ask admin to increase the limit or delete an existing finger."
+        )
+
     rp_id   = getattr(settings, 'WEBAUTHN_RP_ID',   '127.0.0.1')
     rp_name = getattr(settings, 'WEBAUTHN_RP_NAME', 'SmartHR')
 
     challenge = generate_challenge()
 
-    # Store challenge in DB
-    from attendance.models import WebAuthnChallenge
+    # Store challenge
     WebAuthnChallenge.objects.filter(
         employee=employee, purpose='register'
     ).delete()
     WebAuthnChallenge.objects.create(
-        employee=employee,
-        challenge=challenge,
-        purpose='register',
+        employee=employee, challenge=challenge, purpose='register'
     )
 
-    # User ID — base64url of employee PK
+    # Exclude already-enrolled credentials so device doesn't duplicate
+    existing = list(FingerCredential.objects.filter(
+        employee=employee, is_active=True
+    ).values_list('credential_id', flat=True))
+
     user_id = b64url_encode(str(employee.pk).encode())
 
     options = {
-        'rp': {
-            'id':   rp_id,
-            'name': rp_name,
-        },
+        'rp': {'id': rp_id, 'name': rp_name},
         'user': {
             'id':          user_id,
             'name':        employee.user.username,
             'displayName': employee.get_full_name(),
         },
-        'challenge': challenge,
+        'challenge':       challenge,
         'pubKeyCredParams': [
-            {'type': 'public-key', 'alg': -7},    # ES256 (ECDSA with P-256)
-            {'type': 'public-key', 'alg': -257},   # RS256 (RSA-PKCS1-v1_5)
+            {'type': 'public-key', 'alg': -7},
+            {'type': 'public-key', 'alg': -257},
         ],
-        'timeout': 60000,
+        'timeout':          60000,
+        'excludeCredentials': [
+            {'type': 'public-key', 'id': cid} for cid in existing
+        ],
         'authenticatorSelection': {
-            'authenticatorAttachment': 'platform',  # use device built-in (fingerprint/face)
-            'userVerification': 'required',         # require biometric
-            'residentKey': 'preferred',
+            'authenticatorAttachment': 'platform',
+            'userVerification':        'required',
+            'residentKey':             'preferred',
         },
-        'attestation': 'none',  # simplest — no hardware attestation needed
+        'attestation':  'none',
+        'finger_label': finger_label,  # passed back to client for reference
+        'current_count':     current_count,
+        'max_allowed':       employee.max_fingers_allowed,
     }
     return options
 
 
-def verify_registration(employee, credential_json):
-    """
-    Verify the credential returned by the browser after biometric enrollment.
-    Saves the public key to the Employee model.
-
-    credential_json: dict from browser's navigator.credentials.create()
-    """
+def verify_registration(employee, credential_json, finger_label='any', device_info=''):
+    """Verify and save one finger credential."""
     try:
+        from employees.models import FingerCredential
         from attendance.models import WebAuthnChallenge
 
-        # Get stored challenge
         ch_obj = WebAuthnChallenge.objects.filter(
             employee=employee, purpose='register'
         ).latest('created_at')
@@ -129,48 +114,48 @@ def verify_registration(employee, credential_json):
 
         expected_challenge = ch_obj.challenge
 
-        # Parse clientDataJSON
-        client_data_b64 = credential_json.get('clientDataJSON', '')
-        client_data     = json.loads(b64url_decode(client_data_b64).decode())
+        client_data = json.loads(
+            b64url_decode(credential_json.get('clientDataJSON', '')).decode()
+        )
 
         if client_data.get('type') != 'webauthn.create':
             return False, 'Invalid credential type.'
 
-        received_challenge = client_data.get('challenge', '')
-        if received_challenge != expected_challenge:
+        if client_data.get('challenge', '') != expected_challenge:
             return False, 'Challenge mismatch.'
 
-        rp_id     = getattr(settings, 'WEBAUTHN_RP_ID', '127.0.0.1')
-        origin    = getattr(settings, 'WEBAUTHN_ORIGIN', 'http://127.0.0.1:8000')
-
-        if client_data.get('origin') != origin:
-            logger.warning(
-                f"WebAuthn origin mismatch: got {client_data.get('origin')}, expected {origin}"
-            )
-            # Allow in dev — in production remove this pass
-            pass
-
-        # Store credential ID and public key (raw, base64url)
         credential_id = credential_json.get('id', '')
         public_key    = credential_json.get('response', {}).get('attestationObject', '')
 
+        if not credential_id or not public_key:
+            return False, 'Missing credential data.'
+
+        # Save as a FingerCredential
+        FingerCredential.objects.create(
+            employee     = employee,
+            finger_label = finger_label,
+            credential_id = credential_id,
+            public_key    = public_key,
+            sign_count    = 0,
+            device_info   = device_info or '',
+        )
+
+        # Update legacy field for backward compatibility
+        employee.webauthn_enrolled      = True
         employee.webauthn_credential_id = credential_id
         employee.webauthn_public_key    = public_key
-        employee.webauthn_sign_count    = 0
-        employee.webauthn_enrolled      = True
         employee.save(update_fields=[
-            'webauthn_credential_id',
-            'webauthn_public_key',
-            'webauthn_sign_count',
-            'webauthn_enrolled',
+            'webauthn_enrolled', 'webauthn_credential_id', 'webauthn_public_key'
         ])
 
         ch_obj.delete()
-        logger.info(f"WebAuthn enrolled for employee {employee.employee_id}")
-        return True, 'Fingerprint enrolled successfully.'
+
+        count = FingerCredential.objects.filter(employee=employee, is_active=True).count()
+        logger.info(f"Finger enrolled: {employee.employee_id} ({finger_label}) — total {count}")
+        return True, f'Finger enrolled! ({count}/{employee.max_fingers_allowed} used)'
 
     except Exception as e:
-        logger.error(f"WebAuthn registration error: {e}")
+        logger.error(f"Registration error: {e}")
         return False, f'Enrollment failed: {str(e)}'
 
 
@@ -178,47 +163,52 @@ def verify_registration(employee, credential_json):
 
 def get_authentication_options(employee):
     """
-    Build WebAuthn PublicKeyCredentialRequestOptions to send to the browser.
-    The browser uses this to ask the device to sign with the stored credential.
+    Build auth options listing ALL enrolled fingers for this employee.
+    Browser will match whichever credential is on the device.
     """
-    rp_id = getattr(settings, 'WEBAUTHN_RP_ID', '127.0.0.1')
+    from employees.models import FingerCredential
+    from attendance.models import WebAuthnChallenge
 
+    credentials = FingerCredential.objects.filter(
+        employee=employee, is_active=True
+    )
+
+    if not credentials.exists():
+        raise ValueError('No fingerprints enrolled. Please enroll first.')
+
+    rp_id     = getattr(settings, 'WEBAUTHN_RP_ID', '127.0.0.1')
     challenge = generate_challenge()
 
-    from attendance.models import WebAuthnChallenge
     WebAuthnChallenge.objects.filter(
         employee=employee, purpose='authenticate'
     ).delete()
     WebAuthnChallenge.objects.create(
-        employee=employee,
-        challenge=challenge,
-        purpose='authenticate',
+        employee=employee, challenge=challenge, purpose='authenticate'
     )
 
     options = {
-        'challenge': challenge,
-        'rpId':      rp_id,
-        'timeout':   60000,
-        'userVerification': 'required',
-        'allowCredentials': [{
-            'type':       'public-key',
-            'id':         employee.webauthn_credential_id,
-            'transports': ['internal'],  # device built-in authenticator
-        }],
+        'challenge':         challenge,
+        'rpId':              rp_id,
+        'timeout':           60000,
+        'userVerification':  'required',
+        'allowCredentials': [
+            {
+                'type':       'public-key',
+                'id':         c.credential_id,
+                'transports': ['internal'],
+            }
+            for c in credentials
+        ],
     }
     return options
 
 
 def verify_authentication(employee, assertion_json):
-    """
-    Verify the assertion returned by the browser after biometric authentication.
-    For a full production deployment, implement full CBOR/COSE verification.
-    For development/demo, we verify the challenge match and credential ID match.
-
-    assertion_json: dict from browser's navigator.credentials.get()
-    """
+    """Verify assertion against any of the employee's enrolled fingers."""
     try:
+        from employees.models import FingerCredential
         from attendance.models import WebAuthnChallenge
+        from django.utils import timezone
 
         ch_obj = WebAuthnChallenge.objects.filter(
             employee=employee, purpose='authenticate'
@@ -229,38 +219,43 @@ def verify_authentication(employee, assertion_json):
             return False, 'Challenge expired. Please scan again.'
 
         expected_challenge = ch_obj.challenge
+        received_id        = assertion_json.get('id', '')
 
-        # Verify credential ID matches enrolled credential
-        received_id = assertion_json.get('id', '')
-        if received_id != employee.webauthn_credential_id:
-            return False, 'Credential ID mismatch.'
+        # Find matching credential
+        try:
+            finger = FingerCredential.objects.get(
+                employee=employee,
+                credential_id=received_id,
+                is_active=True,
+            )
+        except FingerCredential.DoesNotExist:
+            return False, 'Fingerprint not recognised. Please try another finger.'
 
-        # Parse clientDataJSON
-        client_data_b64 = assertion_json.get('clientDataJSON', '')
-        client_data     = json.loads(b64url_decode(client_data_b64).decode())
-
+        # Verify challenge
+        client_data = json.loads(
+            b64url_decode(assertion_json.get('clientDataJSON', '')).decode()
+        )
         if client_data.get('type') != 'webauthn.get':
             return False, 'Invalid assertion type.'
-
-        received_challenge = client_data.get('challenge', '')
-        if received_challenge != expected_challenge:
-            return False, 'Challenge mismatch. Possible replay attack.'
+        if client_data.get('challenge', '') != expected_challenge:
+            return False, 'Challenge mismatch.'
 
         # Update sign count (anti-replay)
-        auth_data_b64  = assertion_json.get('authenticatorData', '')
+        auth_data_b64 = assertion_json.get('authenticatorData', '')
         if auth_data_b64:
-            auth_data  = b64url_decode(auth_data_b64)
+            auth_data = b64url_decode(auth_data_b64)
             if len(auth_data) >= 37:
-                new_sign_count = struct.unpack('>I', auth_data[33:37])[0]
-                if new_sign_count > 0 and new_sign_count <= employee.webauthn_sign_count:
+                new_count = struct.unpack('>I', auth_data[33:37])[0]
+                if new_count > 0 and new_count <= finger.sign_count:
                     return False, 'Sign count invalid. Possible cloned authenticator.'
-                employee.webauthn_sign_count = new_sign_count
-                employee.save(update_fields=['webauthn_sign_count'])
+                finger.sign_count  = new_count
+                finger.last_used_at = timezone.now()
+                finger.save(update_fields=['sign_count', 'last_used_at'])
 
         ch_obj.delete()
-        logger.info(f"WebAuthn authenticated: {employee.employee_id}")
-        return True, 'Fingerprint verified.'
+        logger.info(f"Fingerprint verified: {employee.employee_id} ({finger.finger_label})")
+        return True, f'Fingerprint verified ({finger.get_finger_label_display()})'
 
     except Exception as e:
-        logger.error(f"WebAuthn authentication error: {e}")
+        logger.error(f"Auth error: {e}")
         return False, f'Authentication failed: {str(e)}'

@@ -156,6 +156,68 @@ def regenerate_qr(request, pk):
     return redirect('employee_detail', pk=pk)
 
 
+# ─── FINGERPRINT MANAGEMENT ───────────────────────────────────────────────────
+
+@hr_required
+def finger_management(request, pk):
+    """Admin page to view/manage employee's finger credentials."""
+    from employees.models import FingerCredential
+    emp = get_object_or_404(Employee.objects.select_related('user', 'department'), pk=pk)
+    credentials  = FingerCredential.objects.filter(employee=emp, is_active=True)
+    slots_used   = credentials.count()
+    empty_count  = max(0, emp.max_fingers_allowed - slots_used)
+    empty_slots  = range(empty_count)
+    return render(request, 'employees/finger_management.html', {
+        'emp':         emp,
+        'credentials': credentials,
+        'empty_slots': empty_slots,
+    })
+
+
+@hr_required
+def set_max_fingers(request, pk):
+    """Admin sets how many fingers an employee can enroll."""
+    emp = get_object_or_404(Employee, pk=pk)
+    if request.method == 'POST':
+        max_f = int(request.POST.get('max_fingers', 3))
+        emp.max_fingers_allowed = max(1, min(5, max_f))
+        emp.save(update_fields=['max_fingers_allowed'])
+        messages.success(request, f"Max fingers set to {emp.max_fingers_allowed}.")
+    return redirect('finger_management', pk=pk)
+
+
+@hr_required
+def delete_finger(request, cred_pk):
+    """Admin deletes one finger credential."""
+    from employees.models import FingerCredential
+    cred = get_object_or_404(FingerCredential, pk=cred_pk)
+    emp_pk = cred.employee.pk
+    if request.method == 'POST':
+        cred.is_active = False
+        cred.save(update_fields=['is_active'])
+        # Update legacy flag if no active credentials left
+        if not FingerCredential.objects.filter(employee=cred.employee, is_active=True).exists():
+            cred.employee.webauthn_enrolled = False
+            cred.employee.save(update_fields=['webauthn_enrolled'])
+        messages.success(request, "Finger credential removed.")
+    return redirect('finger_management', pk=emp_pk)
+
+
+@hr_required
+def delete_all_fingers(request, pk):
+    """Admin removes ALL finger credentials for an employee."""
+    from employees.models import FingerCredential
+    emp = get_object_or_404(Employee, pk=pk)
+    if request.method == 'POST':
+        FingerCredential.objects.filter(employee=emp).update(is_active=False)
+        emp.webauthn_enrolled      = False
+        emp.webauthn_credential_id = None
+        emp.webauthn_public_key    = None
+        emp.save(update_fields=['webauthn_enrolled', 'webauthn_credential_id', 'webauthn_public_key'])
+        messages.success(request, "All fingerprints removed.")
+    return redirect('finger_management', pk=pk)
+
+
 # --- Department ---
 
 @hr_required
