@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block title %}{{ action }} Employee{% endblock %}
+{% block page_title %}{{ action }} Employee{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+        <div class="page-header">
+            <div>
+                <h4><i class="bi bi-person-plus-fill me-2"></i>{{ action }} Employee</h4>
+                <p>Fill in the details below to {{ action|lower }} an employee</p>
+            </div>
+            <a href="{% url 'employee_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Back
+            </a>
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="row g-3">
+                <!-- Personal Info -->
+                <div class="col-12 col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-person me-2"></i>Personal Information</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if action == 'Add' %}
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <label class="form-label fw-semibold">First Name *</label>
+                                    {{ form.first_name }}
+                                    {% if form.first_name.errors %}
+                                    <div class="text-danger mt-1" style="font-size:12px;">{{ form.first_name.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-semibold">Last Name *</label>
+                                    {{ form.last_name }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Username *</label>
+                                    {{ form.username }}
+                                    {% if form.username.errors %}
+                                    <div class="text-danger mt-1" style="font-size:12px;">{{ form.username.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Email *</label>
+                                    {{ form.email }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Phone</label>
+                                    {{ form.phone }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Password *</label>
+                                    {{ form.password }}
+                                    <div class="form-text">Min 8 characters</div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <label class="form-label fw-semibold">First Name</label>
+                                    {{ form.first_name }}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-semibold">Last Name</label>
+                                    {{ form.last_name }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Email</label>
+                                    {{ form.email }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Phone</label>
+                                    {{ form.phone }}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Work Info -->
+                <div class="col-12 col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-briefcase me-2"></i>Work Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Employee ID *</label>
+                                    {{ form.employee_id }}
+                                    {% if form.employee_id.errors %}
+                                    <div class="text-danger mt-1" style="font-size:12px;">{{ form.employee_id.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Department *</label>
+                                    {{ form.department }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Shift</label>
+                                    {{ form.shift }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Designation *</label>
+                                    {{ form.designation }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Joining Date *</label>
+                                    {{ form.joining_date }}
+                                </div>
+                                {% if action == 'Edit' %}
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Status</label>
+                                    {{ form.status }}
+                                </div>
+                                {% endif %}
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Photo</label>
+                                    {{ form.photo }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3 mt-4">
+                <button type="submit" class="btn btn-primary px-5">
+                    <i class="bi bi-check2 me-2"></i>{{ action }} Employee
+                </button>
+                <a href="{% url 'employee_list' %}" class="btn btn-outline-secondary px-4">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

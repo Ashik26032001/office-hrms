@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HRMS{% endblock %} | SmartHR Attendance</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1e3a5f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SmartHR">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/static/icons/icon-144x144.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #1e3a5f;
+            --primary-light: #2a4f7a;
+            --accent: #00b4d8;
+            --accent-dark: #0096b4;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --sidebar-width: 260px;
+            --topbar-height: 64px;
+            --bg: #f0f4f8;
+            --card-bg: #ffffff;
+            --text-muted: #6b7280;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: #1a2535;
+            margin: 0;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            position: fixed;
+            left: 0; top: 0; bottom: 0;
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, var(--primary) 0%, #0f2a4a 100%);
+            z-index: 1000;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+        }
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-decoration: none;
+        }
+        .sidebar-brand .brand-icon {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--accent), #0077b6);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: white;
+        }
+        .sidebar-brand .brand-text {
+            color: white;
+        }
+        .sidebar-brand .brand-text h6 {
+            margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;
+        }
+        .sidebar-brand .brand-text small {
+            font-size: 10px; color: rgba(255,255,255,0.6); text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sidebar-section {
+            padding: 20px 12px 8px;
+        }
+        .sidebar-section-label {
+            font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+            color: rgba(255,255,255,0.4); font-weight: 600;
+            padding: 0 8px; margin-bottom: 8px;
+        }
+        .sidebar-nav .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: rgba(255,255,255,0.75);
+            font-size: 13.5px;
+            font-weight: 500;
+            transition: all 0.2s;
+            margin-bottom: 2px;
+            text-decoration: none;
+        }
+        .sidebar-nav .nav-link i { font-size: 17px; min-width: 20px; }
+        .sidebar-nav .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        .sidebar-nav .nav-link.active {
+            background: linear-gradient(90deg, var(--accent), #0096b4);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,180,216,0.3);
+        }
+        .sidebar-nav .nav-link .badge {
+            margin-left: auto; font-size: 10px;
+        }
+
+        /* ===== TOPBAR ===== */
+        .topbar {
+            position: fixed;
+            top: 0; left: var(--sidebar-width); right: 0;
+            height: var(--topbar-height);
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 999;
+            box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+        }
+        .topbar .page-title {
+            font-size: 18px; font-weight: 700; color: var(--primary);
+        }
+        .topbar .topbar-right {
+            display: flex; align-items: center; gap: 16px;
+        }
+        .topbar .live-clock {
+            font-size: 13px; color: var(--text-muted);
+            background: var(--bg); padding: 6px 12px; border-radius: 20px;
+        }
+        .topbar .user-badge {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 12px; border-radius: 20px;
+            background: var(--bg); cursor: pointer;
+            text-decoration: none; color: inherit;
+        }
+        .topbar .user-badge .avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 13px; font-weight: 600;
+        }
+        .topbar .user-badge small { font-size: 11px; color: var(--text-muted); }
+        .topbar .user-badge span { font-size: 13px; font-weight: 600; }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--topbar-height);
+            padding: 24px;
+            min-height: calc(100vh - var(--topbar-height));
+        }
+
+        /* ===== CARDS ===== */
+        .card {
+            border: none;
+            border-radius: 14px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            background: var(--card-bg);
+        }
+        .card-header {
+            border-bottom: 1px solid #f3f4f6;
+            border-radius: 14px 14px 0 0 !important;
+            background: white;
+            padding: 16px 20px;
+        }
+
+        /* ===== KPI CARDS ===== */
+        .kpi-card {
+            border-radius: 14px;
+            padding: 20px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            transition: transform 0.2s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); }
+        .kpi-card::after {
+            content: '';
+            position: absolute;
+            right: -20px; top: -20px;
+            width: 100px; height: 100px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+        }
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            right: 10px; bottom: -30px;
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.07);
+        }
+        .kpi-card .kpi-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            background: rgba(255,255,255,0.2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; margin-bottom: 14px;
+        }
+        .kpi-card .kpi-value {
+            font-size: 32px; font-weight: 700; line-height: 1;
+            margin-bottom: 4px;
+        }
+        .kpi-card .kpi-label {
+            font-size: 12px; opacity: 0.85; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .kpi-blue { background: linear-gradient(135deg, #1e3a5f 0%, #2a5f9e 100%); }
+        .kpi-teal { background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%); }
+        .kpi-green { background: linear-gradient(135deg, #059669 0%, #22c55e 100%); }
+        .kpi-orange { background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); }
+        .kpi-red { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); }
+        .kpi-purple { background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); }
+
+        /* ===== STATUS BADGES ===== */
+        .status-in {
+            background: #dcfce7; color: #166534;
+            border-radius: 20px; padding: 3px 10px;
+            font-size: 11px; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .status-out {
+            background: #fee2e2; color: #991b1b;
+            border-radius: 20px; padding: 3px 10px;
+            font-size: 11px; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .status-in::before {
+            content: ''; width: 6px; height: 6px; border-radius: 50%;
+            background: #22c55e; display: inline-block;
+            animation: pulse-green 1.5s infinite;
+        }
+        .status-out::before {
+            content: ''; width: 6px; height: 6px; border-radius: 50%;
+            background: #ef4444; display: inline-block;
+        }
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ===== TABLE ===== */
+        .table-modern {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .table-modern thead th {
+            background: var(--bg);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 16px;
+            border: none;
+        }
+        .table-modern tbody tr {
+            transition: background 0.15s;
+        }
+        .table-modern tbody tr:hover {
+            background: #f8fafc;
+        }
+        .table-modern tbody td {
+            padding: 12px 16px;
+            border-top: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+
+        /* ===== EMPLOYEE AVATAR ===== */
+        .emp-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: inline-flex; align-items: center; justify-content: center;
+            color: white; font-size: 13px; font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        /* ===== BTN ===== */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border: none; border-radius: 8px;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-light), #3a6ea8);
+        }
+        .btn-accent {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            border: none; border-radius: 8px; color: white;
+        }
+        .btn-accent:hover { color: white; opacity: 0.9; }
+
+        /* ===== ALERTS ===== */
+        .alert { border: none; border-radius: 10px; }
+        .alert-success { background: #dcfce7; color: #166534; }
+        .alert-danger { background: #fee2e2; color: #991b1b; }
+        .alert-info { background: #e0f2fe; color: #075985; }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        /* ===== PAGE HEADER ===== */
+        .page-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .page-header h4 {
+            font-size: 22px; font-weight: 700; color: var(--primary); margin: 0;
+        }
+        .page-header p { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+
+        /* ===== MOBILE ===== */
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .topbar { left: 0; }
+            .main-content { margin-left: 0; }
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- ═══ PWA Install Banner ═══════════════════════════════════════════════════ -->
+<div id="pwaInstallBanner" style="
+    display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10000;
+    background: linear-gradient(135deg, #1e3a5f, #0077b6);
+    color: white; padding: 14px 20px;
+    align-items: center; justify-content: space-between; gap: 12px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
+    flex-wrap: wrap;">
+    <div style="display:flex; align-items:center; gap:12px;">
+        <img src="/static/icons/icon-72x72.png" alt=""
+             style="width:44px;height:44px;border-radius:10px;">
+        <div>
+            <div style="font-weight:700;font-size:14px;">Install SmartHR</div>
+            <div style="font-size:12px;opacity:0.85;">
+                Add to home screen — works like a real app, no app store needed
+            </div>
+        </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-shrink:0;">
+        <button id="pwaDismissBtn" style="
+            background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer;">
+            Not now
+        </button>
+        <button id="pwaInstallBtn" style="
+            background: #00b4d8; color: white; border: none;
+            border-radius: 8px; padding: 7px 18px; font-size: 13px;
+            font-weight: 700; cursor: pointer;">
+            📲 Install App
+        </button>
+    </div>
+</div>
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- ===== SIDEBAR ===== -->
+<nav class="sidebar" id="sidebar">
+    <a href="{% url 'admin_dashboard' %}" class="sidebar-brand">
+        <div class="brand-icon"><i class="bi bi-building"></i></div>
+        <div class="brand-text">
+            <h6>SmartHR</h6>
+            <small>Attendance System</small>
+        </div>
+    </a>
+
+    {% if user.is_authenticated and user.is_admin_or_hr %}
+    <!-- ADMIN / HR MENU -->
+    <div class="sidebar-section">
+        <div class="sidebar-section-label">Main Menu</div>
+        <ul class="nav flex-column sidebar-nav">
+            <li>
+                <a href="{% url 'admin_dashboard' %}" class="nav-link {% block nav_dashboard %}{% endblock %}">
+                    <i class="bi bi-grid-1x2-fill"></i> Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'attendance_log' %}" class="nav-link {% block nav_attendance %}{% endblock %}">
+                    <i class="bi bi-clock-history"></i> Attendance Log
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'office_scanner' %}" class="nav-link {% block nav_scanner %}{% endblock %}">
+                    <i class="bi bi-qr-code-scan"></i> QR Scanner
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-section-label">Employees</div>
+        <ul class="nav flex-column sidebar-nav">
+            <li>
+                <a href="{% url 'employee_list' %}" class="nav-link {% block nav_employees %}{% endblock %}">
+                    <i class="bi bi-people-fill"></i> All Employees
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'employee_create' %}" class="nav-link {% block nav_add_emp %}{% endblock %}">
+                    <i class="bi bi-person-plus-fill"></i> Add Employee
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'department_list' %}" class="nav-link {% block nav_dept %}{% endblock %}">
+                    <i class="bi bi-diagram-3-fill"></i> Departments
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-section-label">Reports</div>
+        <ul class="nav flex-column sidebar-nav">
+            <li>
+                <a href="{% url 'daily_report' %}" class="nav-link {% block nav_daily %}{% endblock %}">
+                    <i class="bi bi-calendar-day-fill"></i> Daily Report
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'monthly_report' %}" class="nav-link {% block nav_monthly %}{% endblock %}">
+                    <i class="bi bi-calendar-range-fill"></i> Monthly Report
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'manual_attendance' %}" class="nav-link {% block nav_manual %}{% endblock %}">
+                    <i class="bi bi-pencil-square"></i> Manual Entry
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    {% else %}
+    <!-- EMPLOYEE MENU -->
+    <div class="sidebar-section">
+        <div class="sidebar-section-label">My Portal</div>
+        <ul class="nav flex-column sidebar-nav">
+            <li>
+                <a href="{% url 'employee_dashboard' %}" class="nav-link {% block nav_my_dashboard %}{% endblock %}">
+                    <i class="bi bi-house-fill"></i> My Dashboard
+                </a>
+            </li>
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="sidebar-section mt-auto">
+        <ul class="nav flex-column sidebar-nav">
+            {% if user.is_authenticated and user.is_admin_or_hr %}
+            <li>
+                <a href="{% url 'settings_page' %}" class="nav-link {% block nav_settings %}{% endblock %}">
+                    <i class="bi bi-gear-fill"></i> Settings
+                </a>
+            </li>
+            {% endif %}
+            <li>
+                <a href="{% url 'profile' %}" class="nav-link {% block nav_profile %}{% endblock %}">
+                    <i class="bi bi-person-circle"></i> My Profile
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'logout' %}" class="nav-link" style="color: rgba(255,100,100,0.8);">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<!-- ===== TOPBAR ===== -->
+<div class="topbar">
+    <div class="d-flex align-items-center gap-3">
+        <button class="btn btn-sm d-md-none" onclick="toggleSidebar()" id="menuBtn">
+            <i class="bi bi-list fs-5"></i>
+        </button>
+        <span class="page-title">{% block page_title %}Dashboard{% endblock %}</span>
+    </div>
+    <div class="topbar-right">
+        <div class="live-clock d-none d-md-block">
+            <i class="bi bi-clock me-1"></i>
+            <span id="liveClock"></span>
+        </div>
+        <a href="{% url 'profile' %}" class="user-badge">
+            <div class="avatar">
+                {% if user.get_full_name %}{{ user.get_full_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}
+            </div>
+            <div class="d-none d-md-block">
+                <div class="fw-semibold" style="font-size:13px;">
+                    {{ user.get_full_name|default:user.username }}
+                </div>
+                <small>{{ user.role|capfirst }}</small>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main class="main-content">
+    <!-- Messages -->
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-3" role="alert">
+        <i class="bi bi-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' or message.tags == 'danger' %}x-circle{% else %}info-circle{% endif %}-fill me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+    // Live clock
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-US', {
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Mobile sidebar toggle
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // Auto-dismiss alerts after 4 seconds
+    setTimeout(() => {
+        document.querySelectorAll('.alert').forEach(a => {
+            if (a.classList.contains('show')) {
+                new bootstrap.Alert(a).close();
+            }
+        });
+    }, 4000);
+</script>
+
+{% block extra_js %}{% endblock %}
+
+<!-- ═══ PWA — Service Worker + Install Prompt ═══════════════════════════════ -->
+<script>
+// ── Register Service Worker ───────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then(reg => {
+                console.log('SW registered:', reg.scope);
+                // Check for updates every 60 seconds
+                setInterval(() => reg.update(), 60000);
+            })
+            .catch(err => console.log('SW registration failed:', err));
+    });
+}
+
+// ── Install Prompt (Add to Home Screen) ──────────────────────────────────────
+let deferredPrompt = null;
+const installBanner = document.getElementById('pwaInstallBanner');
+const installBtn    = document.getElementById('pwaInstallBtn');
+const dismissBtn    = document.getElementById('pwaDismissBtn');
+
+window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Show install banner if not dismissed before
+    if (!localStorage.getItem('pwa-dismissed')) {
+        setTimeout(() => {
+            if (installBanner) installBanner.style.display = 'flex';
+        }, 3000); // show after 3 seconds
+    }
+});
+
+if (installBtn) {
+    installBtn.addEventListener('click', () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(choice => {
+                if (choice.outcome === 'accepted') {
+                    installBanner.style.display = 'none';
+                    localStorage.setItem('pwa-dismissed', '1');
+                }
+                deferredPrompt = null;
+            });
+        }
+    });
+}
+
+if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => {
+        installBanner.style.display = 'none';
+        localStorage.setItem('pwa-dismissed', '1');
+    });
+}
+
+// ── Detect if already installed ───────────────────────────────────────────────
+window.addEventListener('appinstalled', () => {
+    if (installBanner) installBanner.style.display = 'none';
+    localStorage.setItem('pwa-dismissed', '1');
+    console.log('SmartHR installed as PWA');
+});
+</script>
+</body>
+</html>

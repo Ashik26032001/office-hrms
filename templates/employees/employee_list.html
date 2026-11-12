@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block title %}Employees{% endblock %}
+{% block page_title %}All Employees{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-people-fill me-2"></i>Employees</h4>
+        <p>{{ total }} employee{% if total != 1 %}s{% endif %} found</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'employee_create' %}" class="btn btn-primary">
+            <i class="bi bi-person-plus-fill me-2"></i>Add Employee
+        </a>
+        <a href="{% url 'department_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-diagram-3-fill me-2"></i>Departments
+        </a>
+    </div>
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-5">
+                <input type="text" name="q" value="{{ query }}" 
+                       class="form-control" placeholder="Search by name, ID, designation...">
+            </div>
+            <div class="col-6 col-md-3">
+                <select name="dept" class="form-select">
+                    <option value="">All Departments</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.pk }}" {% if dept_filter == dept.pk|stringformat:'s' %}selected{% endif %}>
+                        {{ dept.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <select name="status" class="form-select">
+                    <option value="">All Status</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{% url 'employee_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Employee Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-modern mb-0">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>ID</th>
+                        <th>Department</th>
+                        <th>Designation</th>
+                        <th>Joined</th>
+                        <th>Live Status</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employees %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if emp.photo %}
+                                <img src="{{ emp.photo.url }}" alt=""
+                                     style="width:36px;height:36px;border-radius:50%;object-fit:cover;">
+                                {% else %}
+                                <div class="emp-avatar">{{ emp.get_full_name|first|upper }}</div>
+                                {% endif %}
+                                <div>
+                                    <div class="fw-semibold" style="font-size:13px;">{{ emp.get_full_name }}</div>
+                                    <small class="text-muted">{{ emp.user.email }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td><code class="text-primary">{{ emp.employee_id }}</code></td>
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                {{ emp.department.name|default:"—" }}
+                            </span>
+                        </td>
+                        <td style="font-size:13px;">{{ emp.designation }}</td>
+                        <td style="font-size:13px;">{{ emp.joining_date|date:"d M Y" }}</td>
+                        <td>
+                            {% if emp.live_status == 'IN' %}
+                            <span class="status-in">IN</span>
+                            {% else %}
+                            <span class="status-out">OUT</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if emp.status == 'active' %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex justify-content-center gap-1">
+                                <a href="{% url 'employee_detail' emp.pk %}" 
+                                   class="btn btn-sm btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'employee_edit' emp.pk %}" 
+                                   class="btn btn-sm btn-outline-warning" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'employee_history' emp.pk %}" 
+                                   class="btn btn-sm btn-outline-info" title="History">
+                                    <i class="bi bi-clock-history"></i>
+                                </a>
+                                <a href="{% url 'employee_delete' emp.pk %}" 
+                                   class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash3"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="bi bi-people fs-1 d-block mb-2"></i>
+                            No employees found
+                            <div class="mt-2">
+                                <a href="{% url 'employee_create' %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-person-plus me-1"></i>Add First Employee
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

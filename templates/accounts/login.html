@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | SmartHR Attendance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f2a4a 0%, #1e3a5f 40%, #0077b6 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle at 30% 50%, rgba(0,180,216,0.08) 0%, transparent 60%),
+                        radial-gradient(circle at 70% 20%, rgba(255,255,255,0.04) 0%, transparent 50%);
+        }
+        .login-wrapper {
+            display: flex;
+            width: 920px;
+            min-height: 560px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+            position: relative;
+            z-index: 1;
+        }
+        .login-left {
+            flex: 1;
+            background: linear-gradient(160deg, #00b4d8 0%, #0077b6 50%, #1e3a5f 100%);
+            padding: 50px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-left::before {
+            content: '';
+            position: absolute;
+            right: -60px; top: -60px;
+            width: 240px; height: 240px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .login-left::after {
+            content: '';
+            position: absolute;
+            left: -40px; bottom: -40px;
+            width: 180px; height: 180px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+        }
+        .login-left .brand { color: white; }
+        .login-left .brand .icon {
+            width: 56px; height: 56px; border-radius: 14px;
+            background: rgba(255,255,255,0.2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; margin-bottom: 16px;
+        }
+        .login-left .brand h2 { font-weight: 800; font-size: 28px; margin: 0; }
+        .login-left .brand p { font-size: 13px; opacity: 0.8; margin: 4px 0 0; }
+        .login-left .features { color: white; }
+        .login-left .features h5 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+        .feature-item {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 14px; color: rgba(255,255,255,0.9);
+        }
+        .feature-item .fi { 
+            width: 32px; height: 32px; border-radius: 8px;
+            background: rgba(255,255,255,0.15);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px; flex-shrink: 0;
+        }
+        .feature-item span { font-size: 13px; }
+
+        .login-right {
+            width: 420px;
+            background: white;
+            padding: 50px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .login-right h3 {
+            font-size: 24px; font-weight: 700; color: #1e3a5f;
+            margin-bottom: 6px;
+        }
+        .login-right p.subtitle {
+            color: #6b7280; font-size: 14px; margin-bottom: 32px;
+        }
+        .form-label { font-size: 13px; font-weight: 600; color: #374151; }
+        .form-control {
+            border: 1.5px solid #e5e7eb; border-radius: 10px;
+            padding: 10px 14px; font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-control:focus {
+            border-color: #00b4d8;
+            box-shadow: 0 0 0 3px rgba(0,180,216,0.1);
+        }
+        .input-group-text {
+            border: 1.5px solid #e5e7eb; border-right: none;
+            border-radius: 10px 0 0 10px; background: #f9fafb;
+            color: #9ca3af;
+        }
+        .input-group .form-control { border-radius: 0 10px 10px 0; border-left: none; }
+        .btn-login {
+            background: linear-gradient(135deg, #1e3a5f, #0077b6);
+            color: white; border: none; border-radius: 10px;
+            padding: 12px; font-size: 15px; font-weight: 600;
+            width: 100%; transition: opacity 0.2s, transform 0.2s;
+        }
+        .btn-login:hover { opacity: 0.9; transform: translateY(-1px); color: white; }
+        .alert-danger { background: #fee2e2; border: none; border-radius: 10px; color: #991b1b; }
+        .role-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+        .role-tab {
+            flex: 1; text-align: center; padding: 8px;
+            border: 1.5px solid #e5e7eb; border-radius: 8px;
+            font-size: 12px; font-weight: 500; color: #6b7280;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .role-tab.active {
+            border-color: #1e3a5f; background: #1e3a5f; color: white;
+        }
+
+        @media (max-width: 768px) {
+            .login-wrapper { flex-direction: column; width: 95%; }
+            .login-left { padding: 30px 24px; }
+            .login-right { width: 100%; padding: 30px 24px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-wrapper">
+    <!-- LEFT PANEL -->
+    <div class="login-left">
+        <div class="brand">
+            <div class="icon"><i class="bi bi-building-check"></i></div>
+            <h2>SmartHR</h2>
+            <p>Employee Attendance Management System</p>
+        </div>
+        <div class="features">
+            <h5>Everything you need</h5>
+            <div class="feature-item">
+                <div class="fi"><i class="bi bi-qr-code"></i></div>
+                <span>Unique QR code for every employee</span>
+            </div>
+            <div class="feature-item">
+                <div class="fi"><i class="bi bi-camera-video"></i></div>
+                <span>Webcam-based office QR scanner</span>
+            </div>
+            <div class="feature-item">
+                <div class="fi"><i class="bi bi-clock-history"></i></div>
+                <span>Automatic IN/OUT time tracking</span>
+            </div>
+            <div class="feature-item">
+                <div class="fi"><i class="bi bi-graph-up"></i></div>
+                <span>Live dashboard with 8 chart types</span>
+            </div>
+            <div class="feature-item">
+                <div class="fi"><i class="bi bi-file-earmark-excel"></i></div>
+                <span>Excel attendance reports</span>
+            </div>
+        </div>
+        <div style="color: rgba(255,255,255,0.4); font-size: 11px;">
+            © 2026 SmartHR · All rights reserved
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="login-right">
+        <h3>Welcome back 👋</h3>
+        <p class="subtitle">Sign in to your account to continue</p>
+
+        {% if form.errors %}
+        <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            Invalid username or password. Please try again.
+        </div>
+        {% endif %}
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    {{ form.username }}
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    {{ form.password }}
+                </div>
+            </div>
+            <button type="submit" class="btn btn-login">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+            </button>
+        </form>
+
+        <div class="text-center mt-4">
+            <small class="text-muted">
+                <i class="bi bi-info-circle me-1"></i>
+                Admin &amp; HR: use your credentials<br>
+                Employees: use the account given by HR
+            </small>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Departments{% endblock %}
+{% block page_title %}Departments{% endblock %}
+{% block nav_dept %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-diagram-3-fill me-2"></i>Departments</h4>
+        <p>Manage company departments</p>
+    </div>
+    <a href="{% url 'department_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-2"></i>Add Department
+    </a>
+</div>
+
+<div class="row g-3">
+    {% for dept in departments %}
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-start gap-3">
+                    <div style="width:48px;height:48px;border-radius:12px;
+                                background:linear-gradient(135deg,#1e3a5f,#00b4d8);
+                                display:flex;align-items:center;justify-content:center;
+                                color:white;font-size:20px;flex-shrink:0;">
+                        <i class="bi bi-diagram-3"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="fw-bold mb-1">{{ dept.name }}</h6>
+                        <p class="text-muted mb-2" style="font-size:13px;">
+                            {{ dept.description|default:"No description"|truncatechars:60 }}
+                        </p>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span class="badge bg-light text-dark border">
+                                {{ dept.employees.count }} employee{{ dept.employees.count|pluralize }}
+                            </span>
+                            <a href="{% url 'department_edit' dept.pk %}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil me-1"></i>Edit
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-diagram-3 fs-1 text-muted d-block mb-2"></i>
+                No departments yet
+                <div class="mt-2">
+                    <a href="{% url 'department_create' %}" class="btn btn-primary btn-sm">
+                        Add First Department
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

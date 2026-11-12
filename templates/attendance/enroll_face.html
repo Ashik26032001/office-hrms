@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}Enroll Face{% endblock %}
+{% block page_title %}Face Enrollment{% endblock %}
+
+{% block extra_css %}
+<style>
+    #enrollVideo {
+        width: 100%; border-radius: 12px; background: #0a1628;
+        max-height: 300px; object-fit: cover; display: block;
+    }
+    .capture-frame {
+        position: relative; border-radius: 12px; overflow: hidden;
+    }
+    .capture-frame .oval-guide {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 180px; height: 220px;
+        border: 3px dashed rgba(0,180,216,0.8);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+    #enrollCanvas { display: none; }
+    #capturedPreview {
+        max-width: 100%; border-radius: 12px; display: none;
+        border: 3px solid #22c55e;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-7">
+        <div class="page-header">
+            <div>
+                <h4><i class="bi bi-person-bounding-box me-2"></i>Enroll Face — {{ emp.get_full_name }}</h4>
+                <p>Capture or upload a clear face photo for recognition</p>
+            </div>
+            <a href="{% url 'employee_detail' emp.pk %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Back
+            </a>
+        </div>
+
+        <!-- Current status -->
+        {% if emp.face_enrolled %}
+        <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill"></i>
+            Face already enrolled. You can re-enroll to update the photo.
+        </div>
+        {% endif %}
+
+        <!-- Upload from file -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-upload me-2"></i>Option 1 — Upload Photo</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Select a clear, front-facing photo</label>
+                        <input type="file" name="face_photo" accept="image/*" class="form-control" required>
+                        <div class="form-text">Use a well-lit, forward-facing photo. No sunglasses.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2 me-2"></i>Upload & Enroll
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Webcam capture -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-camera-fill me-2"></i>Option 2 — Capture from Webcam</h6>
+            </div>
+            <div class="card-body">
+                <div class="capture-frame mb-3">
+                    <video id="enrollVideo" autoplay playsinline></video>
+                    <div class="oval-guide"></div>
+                </div>
+                <canvas id="enrollCanvas"></canvas>
+                <img id="capturedPreview" src="" alt="Captured face">
+
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-outline-primary" onclick="startCamera()" id="startCamBtn">
+                        <i class="bi bi-camera-video me-2"></i>Start Camera
+                    </button>
+                    <button class="btn btn-primary" onclick="capturePhoto()" id="captureBtn" disabled>
+                        <i class="bi bi-camera-fill me-2"></i>Capture Photo
+                    </button>
+                    <button class="btn btn-success" onclick="enrollCaptured()" id="enrollBtn"
+                            disabled style="display:none;">
+                        <i class="bi bi-check2 me-2"></i>Enroll This Photo
+                    </button>
+                </div>
+
+                <div id="enrollStatus" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let stream = null;
+
+function startCamera() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } })
+        .then(s => {
+            stream = s;
+            document.getElementById('enrollVideo').srcObject = s;
+            document.getElementById('captureBtn').disabled = false;
+            document.getElementById('startCamBtn').disabled = true;
+        })
+        .catch(() => {
+            document.getElementById('enrollStatus').innerHTML =
+                '<div class="alert alert-danger">Camera access denied.</div>';
+        });
+}
+
+function capturePhoto() {
+    const video  = document.getElementById('enrollVideo');
+    const canvas = document.getElementById('enrollCanvas');
+    const preview = document.getElementById('capturedPreview');
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const b64 = canvas.toDataURL('image/jpeg', 0.9);
+    preview.src     = b64;
+    preview.style.display = 'block';
+    document.getElementById('enrollBtn').style.display = 'inline-flex';
+    document.getElementById('enrollBtn').disabled       = false;
+    // stop camera after capture
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    video.style.display = 'none';
+}
+
+function enrollCaptured() {
+    const b64 = document.getElementById('capturedPreview').src;
+    const btn = document.getElementById('enrollBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Enrolling...';
+
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+        body: JSON.stringify({ image: b64 })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('enrollStatus').innerHTML =
+                '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>' +
+                data.message + ' Face enrolled successfully!</div>';
+            btn.innerHTML = '<i class="bi bi-check2 me-2"></i>Enrolled!';
+        } else {
+            document.getElementById('enrollStatus').innerHTML =
+                `<div class="alert alert-danger">${data.message}</div>`;
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check2 me-2"></i>Enroll This Photo';
+        }
+    })
+    .catch(() => {
+        document.getElementById('enrollStatus').innerHTML =
+            '<div class="alert alert-danger">Error enrolling. Try again.</div>';
+        btn.disabled = false;
+    });
+}
+</script>
+{% endblock %}

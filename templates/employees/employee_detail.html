@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+{% block title %}{{ emp.get_full_name }}{% endblock %}
+{% block page_title %}Employee Profile{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-person-circle me-2"></i>Employee Profile</h4>
+        <p>Detailed view and attendance history</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'employee_edit' emp.pk %}" class="btn btn-primary">
+            <i class="bi bi-pencil me-2"></i>Edit
+        </a>
+        <a href="{% url 'employee_history' emp.pk %}" class="btn btn-outline-info">
+            <i class="bi bi-clock-history me-2"></i>Full History
+        </a>
+        <a href="{% url 'employee_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Back
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Left: Profile + QR -->
+    <div class="col-12 col-md-4">
+        <!-- Profile Card -->
+        <div class="card mb-3">
+            <div class="card-body text-center py-4">
+                {% if emp.photo %}
+                <img src="{{ emp.photo.url }}" alt=""
+                     style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #e5e7eb;">
+                {% else %}
+                <div class="emp-avatar mx-auto mb-3" style="width:90px;height:90px;font-size:36px;border-radius:50%;">
+                    {{ emp.get_full_name|first|upper }}
+                </div>
+                {% endif %}
+                <h5 class="fw-bold mt-3 mb-1">{{ emp.get_full_name }}</h5>
+                <div class="text-muted" style="font-size:13px;">{{ emp.designation }}</div>
+                <div class="mt-2">
+                    <span class="badge bg-light text-dark border me-1">
+                        <i class="bi bi-diagram-3 me-1"></i>{{ emp.department.name|default:"No Dept" }}
+                    </span>
+                    {% if emp.status == 'active' %}
+                    <span class="badge bg-success">Active</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Inactive</span>
+                    {% endif %}
+                </div>
+
+                <hr>
+
+                <div class="text-start" style="font-size:13px;">
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-muted">Employee ID</span>
+                        <strong>{{ emp.employee_id }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-muted">Email</span>
+                        <span>{{ emp.user.email|default:"—" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-muted">Phone</span>
+                        <span>{{ emp.user.phone|default:"—" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-muted">Joined</span>
+                        <span>{{ emp.joining_date|date:"d M Y" }}</span>
+                    </div>
+                    {% if emp.shift %}
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-muted">Shift</span>
+                        <span>{{ emp.shift.name }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mt-3">
+                    {% if live_status == 'IN' %}
+                    <span class="status-in fs-6"><strong>Currently IN Office</strong></span>
+                    {% else %}
+                    <span class="status-out fs-6"><strong>Currently OUT</strong></span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Face + Fingerprint Enrollment -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check me-2"></i>Biometric Enrollment</h6>
+            </div>
+            <div class="card-body">
+                <!-- Face Recognition -->
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-person-bounding-box text-primary fs-5"></i>
+                        <div>
+                            <div class="fw-semibold" style="font-size:13px;">Face Recognition</div>
+                            <small class="text-muted">AI face scan at office camera</small>
+                        </div>
+                    </div>
+                    {% if emp.face_enrolled %}
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-success">Enrolled</span>
+                        <a href="{% url 'enroll_face' emp.pk %}" class="btn btn-sm btn-outline-warning">Update</a>
+                    </div>
+                    {% else %}
+                    <a href="{% url 'enroll_face' emp.pk %}" class="btn btn-sm btn-primary">Enroll Face</a>
+                    {% endif %}
+                </div>
+                <hr class="my-2">
+                <!-- Fingerprint / WebAuthn -->
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-fingerprint text-warning fs-5"></i>
+                        <div>
+                            <div class="fw-semibold" style="font-size:13px;">Fingerprint / Windows Hello</div>
+                            <small class="text-muted">Device biometrics (no hardware needed)</small>
+                        </div>
+                    </div>
+                    {% if emp.webauthn_enrolled %}
+                    <span class="badge bg-success">Enrolled</span>
+                    {% else %}
+                    <button class="btn btn-sm btn-warning" onclick="enrollFingerprint({{ emp.pk }})">
+                        Enroll
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-qr-code me-2"></i>Employee QR Code</h6>
+            </div>
+            <div class="card-body text-center">
+                {% if emp.qr_image %}
+                <img src="{{ emp.qr_image.url }}" alt="QR Code" style="max-width:160px; border-radius:8px;">
+                <div class="mt-2 text-muted" style="font-size:11px;">Token: {{ emp.qr_token }}</div>
+                <div class="d-flex gap-2 mt-3">
+                    <a href="{{ emp.qr_image.url }}" download="qr_{{ emp.employee_id }}.png"
+                       class="btn btn-outline-primary flex-grow-1 btn-sm">
+                        <i class="bi bi-download me-1"></i>Download
+                    </a>
+                    <a href="{% url 'regenerate_qr' emp.pk %}" 
+                       class="btn btn-outline-warning flex-grow-1 btn-sm"
+                       onclick="return confirm('Regenerate QR? Old QR will stop working.')">
+                        <i class="bi bi-arrow-repeat me-1"></i>Regenerate
+                    </a>
+                </div>
+                {% else %}
+                <div class="text-muted py-3">No QR generated</div>
+                <a href="{% url 'regenerate_qr' emp.pk %}" class="btn btn-primary btn-sm">Generate QR</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Recent Attendance -->
+    <div class="col-12 col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-0 fw-bold">Recent Attendance Events</h6>
+                    <small class="text-muted">Last 20 events</small>
+                </div>
+                <a href="{% url 'employee_history' emp.pk %}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-modern mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Recorded by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in recent_events %}
+                            <tr>
+                                <td class="text-muted" style="font-size:12px;">{{ forloop.counter }}</td>
+                                <td>{{ event.timestamp|date:"d M Y" }}</td>
+                                <td class="fw-semibold">{{ event.timestamp|time:"h:i A" }}</td>
+                                <td>
+                                    {% if event.event_type == 'IN' %}
+                                    <span class="status-in">IN</span>
+                                    {% else %}
+                                    <span class="status-out">OUT</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {% if event.is_manual %}
+                                        <i class="bi bi-pencil me-1"></i>Manual
+                                        {% else %}
+                                        <i class="bi bi-qr-code me-1"></i>Scanner
+                                        {% endif %}
+                                    </small>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">No events yet</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Fingerprint / WebAuthn Enrollment ─────────────────────────────────────────
+function b64urlEncode(buffer) {
+    return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64urlDecode(str) {
+    str = str.replace(/-/g,'+').replace(/_/g,'/');
+    while (str.length % 4) str += '=';
+    return Uint8Array.from(atob(str), c => c.charCodeAt(0)).buffer;
+}
+
+async function enrollFingerprint(empPk) {
+    if (!window.PublicKeyCredential) {
+        alert('WebAuthn not supported. Use Chrome or Edge on Windows 10+.');
+        return;
+    }
+    try {
+        const optResp = await fetch(`/attendance/fp/register/${empPk}/`);
+        const optData = await optResp.json();
+        if (!optData.success) { alert(optData.message); return; }
+        const opts = optData.options;
+
+        const pubKey = {
+            rp: opts.rp,
+            user: {
+                id:          b64urlDecode(opts.user.id),
+                name:        opts.user.name,
+                displayName: opts.user.displayName,
+            },
+            challenge:          b64urlDecode(opts.challenge),
+            pubKeyCredParams:   opts.pubKeyCredParams,
+            timeout:            opts.timeout,
+            authenticatorSelection: opts.authenticatorSelection,
+            attestation:        opts.attestation,
+        };
+
+        const credential = await navigator.credentials.create({ publicKey: pubKey });
+        const credData = {
+            id:               credential.id,
+            type:             credential.type,
+            clientDataJSON:   b64urlEncode(credential.response.clientDataJSON),
+            attestationObject: b64urlEncode(credential.response.attestationObject),
+        };
+
+        const verResp = await fetch(`/attendance/fp/register/${empPk}/verify/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify(credData),
+        });
+        const verData = await verResp.json();
+        if (verData.success) { alert('✅ ' + verData.message); location.reload(); }
+        else alert('❌ ' + verData.message);
+    } catch (err) {
+        if (err.name === 'NotAllowedError') alert('Fingerprint scan was cancelled.');
+        else alert('Enrollment error: ' + err.message);
+    }
+}
+</script>
+{% endblock %}

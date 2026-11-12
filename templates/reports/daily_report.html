@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Daily Report{% endblock %}
+{% block page_title %}Daily Attendance Report{% endblock %}
+{% block nav_daily %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-calendar-day-fill me-2"></i>Daily Report</h4>
+        <p>{{ report_date|date:"l, d F Y" }}</p>
+    </div>
+    <a href="{% url 'export_daily_excel' %}?date={{ report_date|date:'Y-m-d' }}" 
+       class="btn btn-success">
+        <i class="bi bi-file-earmark-excel me-2"></i>Export Excel
+    </a>
+</div>
+
+<!-- Summary -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-teal">
+            <div class="kpi-icon"><i class="bi bi-people"></i></div>
+            <div class="kpi-value">{{ report_data|length }}</div>
+            <div class="kpi-label">Total Employees</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-green">
+            <div class="kpi-icon"><i class="bi bi-check-circle"></i></div>
+            <div class="kpi-value">{{ present_count }}</div>
+            <div class="kpi-label">Present</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-red">
+            <div class="kpi-icon"><i class="bi bi-x-circle"></i></div>
+            <div class="kpi-value">{{ absent_count }}</div>
+            <div class="kpi-label">Absent</div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <input type="date" name="date" value="{{ report_date|date:'Y-m-d' }}" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+                <select name="dept" class="form-select">
+                    <option value="">All Departments</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.pk }}" {% if dept_filter == dept.pk|stringformat:'s' %}selected{% endif %}>
+                        {{ dept.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Report Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-modern mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                        <th>Working Hours</th>
+                        <th>Late</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in report_data %}
+                    <tr {% if not r.is_present %}style="opacity:0.6;"{% endif %}>
+                        <td class="text-muted">{{ forloop.counter }}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="emp-avatar" style="{% if not r.is_present %}background:#9ca3af;{% endif %}">
+                                    {{ r.emp.get_full_name|first|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-semibold" style="font-size:13px;">{{ r.emp.get_full_name }}</div>
+                                    <small class="text-muted">{{ r.emp.employee_id }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                {{ r.emp.department.name|default:"—" }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if r.is_present %}
+                            <span class="badge bg-success">Present</span>
+                            {% else %}
+                            <span class="badge bg-danger">Absent</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-success fw-semibold">
+                            {{ r.first_in|time:"h:i A"|default:"—" }}
+                        </td>
+                        <td class="text-danger">
+                            {{ r.last_out|time:"h:i A"|default:"—" }}
+                        </td>
+                        <td>
+                            {% if r.hours or r.minutes %}
+                            <span class="fw-bold">{{ r.hours }}h {{ r.minutes }}m</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if r.is_late %}
+                            <span class="badge bg-warning text-dark">Late</span>
+                            {% else %}
+                            {% if r.is_present %}<span class="text-success">On Time</span>{% else %}—{% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

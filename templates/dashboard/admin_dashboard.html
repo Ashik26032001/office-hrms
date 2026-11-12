@@ -1,0 +1,455 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-grid-1x2-fill me-2 text-primary"></i>Company Dashboard</h4>
+        <p>{{ today|date:"l, d F Y" }} &nbsp;·&nbsp; Real-time attendance overview</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'office_scanner' %}" class="btn btn-accent px-4">
+            <i class="bi bi-qr-code-scan me-2"></i>Open QR Scanner
+        </a>
+        <a href="{% url 'daily_report' %}" class="btn btn-outline-primary px-4">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Reports
+        </a>
+    </div>
+</div>
+
+<!-- ===== KPI CARDS ===== -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="kpi-value">{{ total_employees }}</div>
+            <div class="kpi-label">Total Employees</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="kpi-card kpi-green">
+            <div class="kpi-icon"><i class="bi bi-person-check-fill"></i></div>
+            <div class="kpi-value">{{ currently_in }}</div>
+            <div class="kpi-label">Currently IN</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="kpi-card kpi-red">
+            <div class="kpi-icon"><i class="bi bi-person-dash-fill"></i></div>
+            <div class="kpi-value">{{ currently_out }}</div>
+            <div class="kpi-label">Currently OUT</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="kpi-card kpi-teal">
+            <div class="kpi-icon"><i class="bi bi-calendar-check-fill"></i></div>
+            <div class="kpi-value">{{ present_today }}</div>
+            <div class="kpi-label">Present Today</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="kpi-card kpi-orange">
+            <div class="kpi-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            <div class="kpi-value">{{ late_arrivals }}</div>
+            <div class="kpi-label">Late Arrivals</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="kpi-card kpi-purple">
+            <div class="kpi-icon"><i class="bi bi-stopwatch-fill"></i></div>
+            <div class="kpi-value">{{ avg_hours }}h</div>
+            <div class="kpi-label">Avg Work Hours</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== CHARTS ROW 1 ===== -->
+<div class="row g-3 mb-4">
+    <!-- Daily Attendance Trend (Line) -->
+    <div class="col-12 col-xl-8">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="mb-0 fw-bold">Daily Attendance Trend</h6>
+                    <small class="text-muted">Last 7 days</small>
+                </div>
+                <span class="badge bg-primary rounded-pill">Week</span>
+            </div>
+            <div class="card-body">
+                <canvas id="dailyTrendChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- IN vs OUT Donut -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold">IN vs OUT</h6>
+                <small class="text-muted">Current status today</small>
+            </div>
+            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <canvas id="donutChart" style="max-height: 200px;"></canvas>
+                <div class="d-flex gap-4 mt-3">
+                    <div class="text-center">
+                        <div class="fw-bold text-success fs-5">{{ in_count }}</div>
+                        <small class="text-muted">In Office</small>
+                    </div>
+                    <div class="text-center">
+                        <div class="fw-bold text-danger fs-5">{{ out_count }}</div>
+                        <small class="text-muted">Outside</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== CHARTS ROW 2 ===== -->
+<div class="row g-3 mb-4">
+    <!-- Dept-wise attendance Bar -->
+    <div class="col-12 col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold">Department-wise Attendance</h6>
+                <small class="text-muted">Today's presence by department</small>
+            </div>
+            <div class="card-body">
+                <canvas id="deptChart" height="130"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Monthly summary Column -->
+    <div class="col-12 col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold">Monthly Attendance Summary</h6>
+                <small class="text-muted">Present count this month</small>
+            </div>
+            <div class="card-body">
+                <canvas id="monthlyChart" height="130"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== CHARTS ROW 3 ===== -->
+<div class="row g-3 mb-4">
+    <!-- Avg Working Hours per Dept -->
+    <div class="col-12 col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold">Avg Working Hours by Department</h6>
+                <small class="text-muted">Today's average</small>
+            </div>
+            <div class="card-body">
+                <canvas id="avgHrsChart" height="130"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Absent today -->
+    <div class="col-12 col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold">Present vs Absent</h6>
+                <small class="text-muted">Today's overall</small>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                <canvas id="presentAbsentChart" style="max-height:220px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== LIVE EMPLOYEE STATUS TABLE ===== -->
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <div>
+            <h6 class="mb-0 fw-bold">Live Employee Status</h6>
+            <small class="text-muted">Auto-refreshes every 30 seconds · Last updated: <span id="lastUpdated">—</span></small>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="badge bg-success" id="inBadge">{{ in_count }} IN</span>
+            <span class="badge bg-danger" id="outBadge">{{ out_count }} OUT</span>
+            <a href="{% url 'attendance_log' %}" class="btn btn-sm btn-outline-primary">View Full Log</a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-modern mb-0" id="liveTable">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                        <th>Working Hours</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="liveTableBody">
+                    {% for s in all_status %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="emp-avatar">
+                                    {{ s.employee.get_full_name|first|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-semibold" style="font-size:13px;">{{ s.employee.get_full_name }}</div>
+                                    <small class="text-muted">{{ s.employee.employee_id }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                {{ s.employee.department.name|default:"—" }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="text-success fw-semibold">
+                                {{ s.first_in|time:"h:i A"|default:"—" }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="text-danger">
+                                {{ s.last_out|time:"h:i A"|default:"—" }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if s.total_hours or s.total_minutes %}
+                            <span class="fw-semibold">{{ s.total_hours }}h {{ s.total_minutes }}m</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if s.live_status == 'IN' %}
+                            <span class="status-in">IN</span>
+                            {% else %}
+                            <span class="status-out">OUT</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'employee_history' s.employee.pk %}" 
+                               class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-clock-history"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox fs-3 d-block mb-2"></i>No attendance data today
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// === Chart defaults ===
+Chart.defaults.font.family = 'Inter';
+Chart.defaults.color = '#6b7280';
+
+const blue = '#1e3a5f';
+const teal = '#00b4d8';
+const green = '#22c55e';
+const red = '#ef4444';
+
+// Daily Trend Line Chart
+new Chart(document.getElementById('dailyTrendChart'), {
+    type: 'line',
+    data: {
+        labels: {{ daily_labels|safe }},
+        datasets: [{
+            label: 'Present',
+            data: {{ daily_present|safe }},
+            borderColor: teal,
+            backgroundColor: 'rgba(0,180,216,0.1)',
+            borderWidth: 2.5,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: teal,
+            pointRadius: 4,
+        }, {
+            label: 'Absent',
+            data: {{ daily_absent|safe }},
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239,68,68,0.06)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#ef4444',
+            pointRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+// Donut Chart
+new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['In Office', 'Outside'],
+        datasets: [{
+            data: [{{ in_count }}, {{ out_count }}],
+            backgroundColor: ['#22c55e', '#ef4444'],
+            borderWidth: 0,
+            hoverOffset: 8,
+        }]
+    },
+    options: {
+        cutout: '70%',
+        plugins: { legend: { display: false } },
+        responsive: true,
+    }
+});
+
+// Department Bar Chart
+new Chart(document.getElementById('deptChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ dept_labels|safe }},
+        datasets: [{
+            label: 'Present',
+            data: {{ dept_present|safe }},
+            backgroundColor: teal,
+            borderRadius: 6,
+        }, {
+            label: 'Total',
+            data: {{ dept_total|safe }},
+            backgroundColor: 'rgba(30,58,95,0.15)',
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+// Monthly Column Chart
+new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ month_labels|safe }},
+        datasets: [{
+            label: 'Present',
+            data: {{ month_present|safe }},
+            backgroundColor: 'rgba(30,58,95,0.75)',
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } }
+        }
+    }
+});
+
+// Avg Hours per Dept
+new Chart(document.getElementById('avgHrsChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ dept_labels|safe }},
+        datasets: [{
+            label: 'Avg Hours',
+            data: {{ dept_avg_hrs|safe }},
+            backgroundColor: 'rgba(0,119,182,0.75)',
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, max: 10, grid: { color: '#f3f4f6' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+// Present vs Absent Doughnut
+new Chart(document.getElementById('presentAbsentChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Present', 'Absent'],
+        datasets: [{
+            data: [{{ present_today }}, {{ absent_today }}],
+            backgroundColor: ['#1e3a5f', '#e5e7eb'],
+            borderWidth: 0,
+            hoverOffset: 8,
+        }]
+    },
+    options: {
+        cutout: '65%',
+        plugins: {
+            legend: { position: 'bottom' }
+        },
+        responsive: true,
+    }
+});
+
+// ===== AUTO-REFRESH LIVE TABLE =====
+function refreshLiveTable() {
+    fetch("{% url 'live_status_api' %}")
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('lastUpdated').textContent = data.timestamp;
+            const inCount = data.employees.filter(e => e.live_status === 'IN').length;
+            const outCount = data.employees.filter(e => e.live_status === 'OUT').length;
+            document.getElementById('inBadge').textContent = inCount + ' IN';
+            document.getElementById('outBadge').textContent = outCount + ' OUT';
+
+            const tbody = document.getElementById('liveTableBody');
+            tbody.innerHTML = data.employees.map(e => `
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="emp-avatar">${e.name.charAt(0).toUpperCase()}</div>
+                            <div>
+                                <div class="fw-semibold" style="font-size:13px;">${e.name}</div>
+                                <small class="text-muted">${e.employee_id}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border">${e.department}</span></td>
+                    <td><span class="text-success fw-semibold">${e.first_in}</span></td>
+                    <td><span class="text-danger">${e.last_out}</span></td>
+                    <td>${e.total_hours || e.total_minutes ? `<span class="fw-semibold">${e.total_hours}h ${e.total_minutes}m</span>` : '—'}</td>
+                    <td>${e.live_status === 'IN' 
+                        ? '<span class="status-in">IN</span>' 
+                        : '<span class="status-out">OUT</span>'}</td>
+                    <td><a href="/attendance/employee/${e.id}/history/" class="btn btn-sm btn-outline-secondary"><i class="bi bi-clock-history"></i></a></td>
+                </tr>
+            `).join('');
+        })
+        .catch(err => console.log('Refresh error:', err));
+}
+
+// Auto-refresh every 30 seconds
+setInterval(refreshLiveTable, 30000);
+</script>
+{% endblock %}

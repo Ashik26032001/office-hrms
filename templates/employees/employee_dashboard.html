@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+{% block title %}My Dashboard{% endblock %}
+{% block page_title %}My Attendance{% endblock %}
+{% block nav_my_dashboard %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-banner {
+        background: linear-gradient(135deg, #1e3a5f 0%, #0077b6 60%, #00b4d8 100%);
+        border-radius: 16px;
+        padding: 28px 32px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 24px;
+    }
+    .profile-banner::after {
+        content: '';
+        position: absolute;
+        right: -40px; top: -40px;
+        width: 200px; height: 200px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.08);
+    }
+    .profile-banner::before {
+        content: '';
+        position: absolute;
+        right: 100px; bottom: -60px;
+        width: 160px; height: 160px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.05);
+    }
+    .emp-big-avatar {
+        width: 72px; height: 72px; border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        border: 3px solid rgba(255,255,255,0.4);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 28px; font-weight: 700; color: white;
+        flex-shrink: 0;
+    }
+    .live-status-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 6px 16px; border-radius: 20px; font-size: 14px;
+        font-weight: 600;
+    }
+    .live-in { background: #dcfce7; color: #166534; }
+    .live-out { background: #fee2e2; color: #991b1b; }
+    .live-in .dot { background: #22c55e; animation: pulse-green 1.5s infinite; }
+    .live-out .dot { background: #ef4444; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+    .session-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .session-row:last-child { border-bottom: none; }
+    .session-num {
+        width: 28px; height: 28px; border-radius: 8px;
+        background: #e0f2fe; color: #0369a1;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .qr-preview {
+        border: 2px dashed #e5e7eb;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+    .qr-preview img {
+        max-width: 180px;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Profile Banner -->
+<div class="profile-banner">
+    <div class="d-flex align-items-center gap-4" style="position:relative; z-index:1;">
+        {% if emp.photo %}
+        <img src="{{ emp.photo.url }}" alt="Photo" 
+             style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.5);">
+        {% else %}
+        <div class="emp-big-avatar">{{ emp.get_full_name|first|upper }}</div>
+        {% endif %}
+        <div>
+            <h4 class="mb-1 fw-bold">{{ emp.get_full_name }}</h4>
+            <div style="opacity:0.85; font-size:14px;">
+                {{ emp.designation }} &nbsp;·&nbsp; {{ emp.department.name|default:"—" }}
+            </div>
+            <div style="opacity:0.7; font-size:12px; margin-top:4px;">
+                ID: {{ emp.employee_id }} &nbsp;·&nbsp; Joined: {{ emp.joining_date|date:"d M Y" }}
+            </div>
+        </div>
+        <div class="ms-auto text-end">
+            <div style="font-size: 12px; opacity:0.7; margin-bottom:6px;">Current Status</div>
+            {% if live_status == 'IN' %}
+            <span class="live-status-pill live-in">
+                <span class="dot"></span> IN OFFICE
+            </span>
+            {% else %}
+            <span class="live-status-pill live-out">
+                <span class="dot"></span> OUT OF OFFICE
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Left column: Today's sessions -->
+    <div class="col-12 col-lg-7">
+        <!-- Today Summary -->
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="mb-0 fw-bold">Today's Attendance</h6>
+                    <small class="text-muted">{{ today|date:"l, d F Y" }}</small>
+                </div>
+                <div class="text-end">
+                    <div class="fw-bold fs-5 text-primary">{{ total_hours }}h {{ total_minutes_rem }}m</div>
+                    <small class="text-muted">Total worked today</small>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if sessions %}
+                {% for session in sessions %}
+                <div class="session-row">
+                    <div class="session-num">{{ forloop.counter }}</div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between">
+                            <span>
+                                <span class="text-success fw-semibold">
+                                    <i class="bi bi-box-arrow-in-right me-1"></i>
+                                    {{ session.in|time:"h:i A" }}
+                                </span>
+                                &nbsp;→&nbsp;
+                                {% if session.out %}
+                                <span class="text-danger fw-semibold">
+                                    <i class="bi bi-box-arrow-right me-1"></i>
+                                    {{ session.out|time:"h:i A" }}
+                                </span>
+                                {% else %}
+                                <span class="text-warning">
+                                    <i class="bi bi-clock me-1"></i>Still IN
+                                </span>
+                                {% endif %}
+                            </span>
+                            {% if session.minutes %}
+                            <span class="badge bg-light text-dark border fw-semibold">
+                                {{ session.minutes|floatformat:0 }}m
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+                    No attendance recorded today
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Events -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold">Recent Attendance Events</h6>
+                <small class="text-muted">Last 30 events</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-modern mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Recorded by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in recent_events %}
+                            <tr>
+                                <td>{{ event.timestamp|date:"d M Y" }}</td>
+                                <td class="fw-semibold">{{ event.timestamp|time:"h:i A" }}</td>
+                                <td>
+                                    {% if event.event_type == 'IN' %}
+                                    <span class="status-in">IN</span>
+                                    {% else %}
+                                    <span class="status-out">OUT</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {% if event.is_manual %}
+                                        <i class="bi bi-pencil me-1"></i>Manual
+                                        {% else %}
+                                        <i class="bi bi-qr-code me-1"></i>Scanner
+                                        {% endif %}
+                                    </small>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">No events found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right column: QR + Profile -->
+    <div class="col-12 col-lg-5">
+        <!-- QR Code -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-qr-code me-2"></i>My QR Code</h6>
+                <small class="text-muted">Show this to the office scanner</small>
+            </div>
+            <div class="card-body">
+                <div class="qr-preview">
+                    {% if emp.qr_image %}
+                    <img src="{{ emp.qr_image.url }}" alt="QR Code" class="mb-3">
+                    {% else %}
+                    <div class="text-muted py-4">
+                        <i class="bi bi-qr-code fs-1"></i>
+                        <div>QR code not generated yet</div>
+                    </div>
+                    {% endif %}
+                    <div class="mt-2 fw-semibold">{{ emp.employee_id }}</div>
+                    <div class="text-muted" style="font-size:12px;">{{ emp.get_full_name }}</div>
+                </div>
+                {% if emp.qr_image %}
+                <a href="{{ emp.qr_image.url }}" download="qr_{{ emp.employee_id }}.png"
+                   class="btn btn-primary w-100 mt-3">
+                    <i class="bi bi-download me-2"></i>Download QR Code
+                </a>
+                {% endif %}
+                <div class="alert alert-info mt-2 mb-0" style="font-size:12px;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Keep this QR private. Don't share with others.
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Summary -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-person-circle me-2"></i>My Profile</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-2" style="font-size:13px;">
+                    <div class="col-5 text-muted">Full Name</div>
+                    <div class="col-7 fw-semibold">{{ emp.get_full_name }}</div>
+
+                    <div class="col-5 text-muted">Employee ID</div>
+                    <div class="col-7 fw-semibold">{{ emp.employee_id }}</div>
+
+                    <div class="col-5 text-muted">Department</div>
+                    <div class="col-7">{{ emp.department.name|default:"—" }}</div>
+
+                    <div class="col-5 text-muted">Designation</div>
+                    <div class="col-7">{{ emp.designation }}</div>
+
+                    <div class="col-5 text-muted">Email</div>
+                    <div class="col-7" style="word-break:break-all;">{{ emp.user.email|default:"—" }}</div>
+
+                    <div class="col-5 text-muted">Phone</div>
+                    <div class="col-7">{{ emp.user.phone|default:"—" }}</div>
+
+                    <div class="col-5 text-muted">Joining Date</div>
+                    <div class="col-7">{{ emp.joining_date|date:"d M Y" }}</div>
+
+                    {% if emp.shift %}
+                    <div class="col-5 text-muted">Shift</div>
+                    <div class="col-7">{{ emp.shift.name }}</div>
+                    <div class="col-5 text-muted">Work Hours</div>
+                    <div class="col-7">{{ emp.shift.start_time|time:"h:i A" }} – {{ emp.shift.end_time|time:"h:i A" }}</div>
+                    {% endif %}
+                </div>
+                <a href="{% url 'profile' %}" class="btn btn-outline-primary w-100 mt-3" style="font-size:13px;">
+                    <i class="bi bi-pencil me-2"></i>Edit Profile
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

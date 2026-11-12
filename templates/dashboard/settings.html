@@ -1,0 +1,658 @@
+{% extends 'base.html' %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .coord-display {
+        background: #1e3a5f;
+        color: white;
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-family: 'Courier New', monospace;
+        font-size: 15px;
+        letter-spacing: 0.5px;
+    }
+    .coord-display span { color: #00b4d8; font-weight: 700; }
+
+    .radius-track {
+        -webkit-appearance: none;
+        height: 8px;
+        border-radius: 4px;
+        background: linear-gradient(to right, #00b4d8 0%, #00b4d8 var(--pct,50%), #e5e7eb var(--pct,50%));
+        outline: none;
+        width: 100%;
+        cursor: pointer;
+    }
+    .radius-track::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 22px; height: 22px;
+        border-radius: 50%;
+        background: #1e3a5f;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    }
+
+    #saveToast {
+        position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+        background: #1e3a5f; color: white; border-radius: 12px;
+        padding: 12px 20px; font-size: 14px; font-weight: 600;
+        display: none; align-items: center; gap: 10px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    }
+
+    .input-box {
+        background: #f8fafc;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+    .input-box-title {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.8px; color: #6b7280; margin-bottom: 10px;
+        display: flex; align-items: center; gap: 6px;
+    }
+
+    .paste-field {
+        width: 100%; border: 2px solid #e5e7eb; border-radius: 10px;
+        padding: 10px 14px; font-size: 13px; outline: none;
+        transition: border-color 0.2s; font-family: 'Inter', sans-serif;
+    }
+    .paste-field:focus  { border-color: #00b4d8; }
+    .paste-field.ok     { border-color: #22c55e; background: #f0fdf4; }
+    .paste-field.err    { border-color: #ef4444; background: #fef2f2; }
+
+    /* Map preview area */
+    #mapPreview {
+        width: 100%; height: 420px; border-radius: 12px;
+        border: 2px solid #e5e7eb; overflow: hidden;
+        display: flex; align-items: center; justify-content: center;
+        background: #f0f4f8; position: relative;
+    }
+    #mapImg {
+        width: 100%; height: 100%; object-fit: cover; border-radius: 10px;
+        display: none;
+    }
+    #mapPlaceholder {
+        text-align: center; color: #9ca3af;
+    }
+    #mapMarker {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -100%);
+        font-size: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+        pointer-events: none; display: none;
+    }
+    .map-actions {
+        display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+    }
+    .btn-gmaps {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: #4285F4; color: white; border: none;
+        border-radius: 8px; padding: 9px 16px; font-size: 13px;
+        font-weight: 600; cursor: pointer; text-decoration: none;
+        transition: opacity 0.2s; flex: 1; justify-content: center;
+    }
+    .btn-gmaps:hover { opacity: 0.9; color: white; }
+    .btn-gmaps.green { background: #34A853; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-gear-fill me-2"></i>Settings</h4>
+        <p>Set your office location, geofence radius and company details</p>
+    </div>
+</div>
+
+<form method="post" id="settingsForm">
+    {% csrf_token %}
+    <div class="row g-4">
+
+        <!-- ══ LEFT — Inputs ═══════════════════════════════════════════════ -->
+        <div class="col-12 col-lg-5">
+
+            <!-- Company Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-building me-2"></i>Company Information</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Company Name</label>
+                        <input type="text" name="company_name" value="{{ cfg.company_name }}" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Email</label>
+                        <input type="email" name="company_email" value="{{ cfg.company_email }}" class="form-control" placeholder="hr@company.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Phone</label>
+                        <input type="text" name="company_phone" value="{{ cfg.company_phone }}" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Address</label>
+                        <textarea name="company_address" class="form-control" rows="2">{{ cfg.company_address }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Geofence Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt-fill me-2"></i>Office Location & Geofence</h6>
+                </div>
+                <div class="card-body">
+
+                    <!-- Toggle -->
+                    <div class="d-flex align-items-center justify-content-between mb-3 p-3 rounded" style="background:#f8fafc;">
+                        <div>
+                            <div class="fw-semibold" style="font-size:14px;">Location Check</div>
+                            <small class="text-muted">Block attendance from outside the office</small>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="geofence_enabled" id="geoSwitch"
+                                   {% if cfg.geofence_enabled %}checked{% endif %}
+                                   style="width:48px;height:26px;cursor:pointer;">
+                        </div>
+                    </div>
+
+                    <!-- Coordinate display -->
+                    <div class="coord-display mb-3">
+                        <div style="font-size:10px;opacity:0.6;margin-bottom:4px;letter-spacing:1px;">CURRENT OFFICE COORDINATES</div>
+                        <div>Lat: <span id="latDisplay">{{ cfg.office_latitude }}</span></div>
+                        <div>Lon: <span id="lonDisplay">{{ cfg.office_longitude }}</span></div>
+                    </div>
+                    <input type="hidden" name="office_latitude"  id="latInput" value="{{ cfg.office_latitude }}">
+                    <input type="hidden" name="office_longitude" id="lonInput" value="{{ cfg.office_longitude }}">
+
+                    <!-- ── Method 1: Paste Google Maps link ── -->
+                    <div class="input-box">
+                        <div class="input-box-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#4285F4"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                            Paste Google Maps Link
+                        </div>
+                        <input type="text" id="googleMapsLink" class="paste-field"
+                               placeholder="https://www.google.com/maps?q=10.0629,76.3478...">
+                        <div id="linkStatus" style="font-size:12px;min-height:18px;margin-top:4px;"></div>
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="button" class="btn btn-primary btn-sm flex-grow-1"
+                                    onclick="parseGoogleMapsLink()">
+                                <i class="bi bi-pin-map-fill me-1"></i>Set from Link
+                            </button>
+                            <a href="https://maps.google.com" target="_blank"
+                               class="btn btn-sm" style="background:#4285F4;color:white;">
+                                Open Maps
+                            </a>
+                        </div>
+                        <div class="mt-2 p-2 rounded" style="background:#fffbeb;border:1px solid #fde68a;font-size:11px;color:#92400e;">
+                            <strong>How:</strong> Open Google Maps → find your office →
+                            right-click the building → click the coordinates shown at top → paste here.<br>
+                            <span style="color:#0077b6;">Also works with any Google Maps share link!</span>
+                        </div>
+                    </div>
+
+                    <!-- ── Method 2: Type coordinates ── -->
+                    <div class="input-box">
+                        <div class="input-box-title">
+                            <i class="bi bi-keyboard"></i> Type Coordinates Manually
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label style="font-size:12px;" class="text-muted form-label">Latitude</label>
+                                <!-- Using text type to avoid browser step validation -->
+                                <input type="text" id="manualLat" class="form-control form-control-sm"
+                                       placeholder="e.g. 10.062903"
+                                       value="{{ cfg.office_latitude }}"
+                                       pattern="-?\d+\.?\d*"
+                                       inputmode="decimal">
+                            </div>
+                            <div class="col-6">
+                                <label style="font-size:12px;" class="text-muted form-label">Longitude</label>
+                                <input type="text" id="manualLon" class="form-control form-control-sm"
+                                       placeholder="e.g. 76.347862"
+                                       value="{{ cfg.office_longitude }}"
+                                       pattern="-?\d+\.?\d*"
+                                       inputmode="decimal">
+                            </div>
+                            <div class="col-12">
+                                <button type="button" class="btn btn-sm btn-outline-primary w-100"
+                                        onclick="applyManualCoords()">
+                                    <i class="bi bi-check2 me-1"></i>Apply These Coordinates
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Method 3: GPS ── -->
+                    <button type="button" class="btn btn-outline-info w-100 mb-2"
+                            onclick="useMyLocation()">
+                        <i class="bi bi-crosshair me-2"></i>Use My Current GPS Location
+                    </button>
+                    <div id="gpsStatus" style="font-size:12px;min-height:20px;"></div>
+
+                    <!-- Radius slider -->
+                    <div class="mt-3">
+                        <label class="form-label fw-semibold d-flex justify-content-between">
+                            Allowed Radius
+                            <span class="badge bg-primary" id="radiusLabel" style="font-size:13px;">
+                                {{ cfg.geofence_radius }}m
+                            </span>
+                        </label>
+                        <input type="range" class="radius-track" name="geofence_radius"
+                               id="radiusSlider" min="50" max="1000" step="10"
+                               value="{{ cfg.geofence_radius }}"
+                               oninput="updateRadius(this.value)">
+                        <div class="d-flex justify-content-between" style="font-size:11px;color:#9ca3af;">
+                            <span>50m (strict)</span><span>500m</span><span>1000m (loose)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                <i class="bi bi-check2-circle me-2"></i>Save All Settings
+            </button>
+        </div>
+
+        <!-- ══ RIGHT — Map Preview ══════════════════════════════════════════ -->
+        <div class="col-12 col-lg-7">
+            <div class="card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-map me-2"></i>Office Location Preview</h6>
+                    <a id="viewOnMapsBtn"
+                       href="https://www.google.com/maps?q={{ cfg.office_latitude }},{{ cfg.office_longitude }}&z=17"
+                       target="_blank"
+                       class="btn btn-sm" style="background:#4285F4;color:white;font-size:12px;">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Open in Google Maps
+                    </a>
+                </div>
+                <div class="card-body p-2">
+                    <div id="mapPreview">
+                        <div id="mapPlaceholder">
+                            <i class="bi bi-geo-alt-fill" style="font-size:48px;color:#cbd5e1;"></i>
+                            <div class="mt-2 fw-semibold text-muted">Map will show here</div>
+                            <div style="font-size:12px;color:#9ca3af;">Set coordinates on the left to preview</div>
+                        </div>
+                        <img id="mapImg" src="" alt="Office location map">
+                        <div id="mapMarker">📍</div>
+                    </div>
+
+                    <!-- Map action buttons -->
+                    <div class="map-actions">
+                        <a id="directionsBtn"
+                           href="https://www.google.com/maps/dir/?api=1&destination={{ cfg.office_latitude }},{{ cfg.office_longitude }}"
+                           target="_blank" class="btn-gmaps green" style="font-size:12px;">
+                            <i class="bi bi-signpost-2"></i> Get Directions
+                        </a>
+                        <button type="button" class="btn-gmaps" style="background:#34A853;font-size:12px;"
+                                onclick="refreshMapPreview()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Map
+                        </button>
+                    </div>
+
+                    <div class="alert alert-info mb-0 mt-2 py-2" style="font-size:12px;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>Map not loading?</strong> Click <strong>"Open in Google Maps"</strong>
+                        to verify your location, then paste the link in the left panel.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info cards -->
+            <div class="card mt-3">
+                <div class="card-body py-3">
+                    <div class="row text-center g-0">
+                        <div class="col-4 border-end">
+                            <div class="fw-bold text-primary" id="infoLat" style="font-size:15px;">
+                                {{ cfg.office_latitude|floatformat:6 }}
+                            </div>
+                            <small class="text-muted">Latitude</small>
+                        </div>
+                        <div class="col-4 border-end">
+                            <div class="fw-bold text-primary" id="infoLon" style="font-size:15px;">
+                                {{ cfg.office_longitude|floatformat:6 }}
+                            </div>
+                            <small class="text-muted">Longitude</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fw-bold text-primary" id="infoRadius" style="font-size:15px;">
+                                {{ cfg.geofence_radius }}m
+                            </div>
+                            <small class="text-muted">Radius</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- How to use guide -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-question-circle me-2"></i>How to Set Your Location</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-column gap-3">
+                        <div class="d-flex gap-3">
+                            <div style="width:32px;height:32px;border-radius:50%;background:#dbeafe;
+                                        display:flex;align-items:center;justify-content:center;
+                                        font-weight:700;color:#1d4ed8;flex-shrink:0;">1</div>
+                            <div>
+                                <div class="fw-semibold" style="font-size:13px;">From Google Maps link</div>
+                                <small class="text-muted">
+                                    Open Google Maps → go to your office → right-click the building →
+                                    click the coordinates at the top to copy → paste in the box on the left.
+                                    <br>OR: share the maps link (like
+                                    <code style="font-size:10px;">maps.google.com/maps?q=10.06,76.34</code>)
+                                    and paste it directly.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-3">
+                            <div style="width:32px;height:32px;border-radius:50%;background:#dcfce7;
+                                        display:flex;align-items:center;justify-content:center;
+                                        font-weight:700;color:#166534;flex-shrink:0;">2</div>
+                            <div>
+                                <div class="fw-semibold" style="font-size:13px;">Type coordinates</div>
+                                <small class="text-muted">
+                                    Copy the numbers from Google Maps (e.g. <strong>10.062903, 76.347862</strong>)
+                                    and type them in the Latitude and Longitude boxes.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-3">
+                            <div style="width:32px;height:32px;border-radius:50%;background:#fef3c7;
+                                        display:flex;align-items:center;justify-content:center;
+                                        font-weight:700;color:#92400e;flex-shrink:0;">3</div>
+                            <div>
+                                <div class="fw-semibold" style="font-size:13px;">Use current GPS</div>
+                                <small class="text-muted">
+                                    If you are physically at the office, click
+                                    <strong>"Use My Current GPS Location"</strong> — the browser will
+                                    capture your position automatically. Allow location permission when asked.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</form>
+
+<!-- Toast -->
+<div id="saveToast">
+    <i class="bi bi-check-circle-fill text-success"></i>
+    <span id="toastMsg">Saved!</span>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
+let currentLat = {{ cfg.office_latitude }};
+let currentLon = {{ cfg.office_longitude }};
+let currentRadius = {{ cfg.geofence_radius }};
+
+// ─── Map Preview (uses static Google Maps image — no API key needed) ──────────
+function refreshMapPreview() {
+    const lat = currentLat, lon = currentLon;
+    // Google Static Maps — works without an API key for basic use
+    // We use a direct maps.google.com link opened in a new tab as the preview
+    // For the image we use a free tile from various sources
+
+    // Show the placeholder with coordinates and an open-link button
+    const preview = document.getElementById('mapPreview');
+    const img     = document.getElementById('mapImg');
+    const ph      = document.getElementById('mapPlaceholder');
+    const mk      = document.getElementById('mapMarker');
+
+    // Try loading Google Static Maps image
+    // Note: requires API key for large volume; works fine for personal/small use
+    const staticUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=16&size=640x420&markers=${lat},${lon},red-pushpin`;
+
+    img.onload = function() {
+        ph.style.display  = 'none';
+        mk.style.display  = 'block';
+        img.style.display = 'block';
+    };
+    img.onerror = function() {
+        // Static map failed — show coordinates-based preview
+        ph.style.display = 'block';
+        img.style.display = 'none';
+        ph.innerHTML = `
+            <i class="bi bi-geo-alt-fill" style="font-size:48px;color:#1e3a5f;"></i>
+            <div class="mt-2 fw-bold" style="color:#1e3a5f;font-size:16px;">
+                Office Location Set ✓
+            </div>
+            <div style="font-size:14px;color:#374151;margin-top:4px;font-family:monospace;">
+                ${lat.toFixed(6)}, ${lon.toFixed(6)}
+            </div>
+            <div style="font-size:12px;color:#6b7280;margin-top:8px;">
+                Map tiles unavailable on this network.<br>
+                Click <strong>"Open in Google Maps"</strong> to verify on the map.
+            </div>
+        `;
+    };
+    img.src = staticUrl;
+
+    // Update all external links
+    const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}&z=17`;
+    document.getElementById('viewOnMapsBtn').href  = mapsUrl;
+    document.getElementById('directionsBtn').href  =
+        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+}
+
+// ─── Apply coordinates everywhere ────────────────────────────────────────────
+function applyCoords(lat, lon, autoSave) {
+    currentLat = parseFloat(lat.toFixed ? lat.toFixed(8) : lat);
+    currentLon = parseFloat(lon.toFixed ? lon.toFixed(8) : lon);
+
+    // Update displays
+    const latStr = currentLat.toFixed(6);
+    const lonStr = currentLon.toFixed(6);
+    document.getElementById('latDisplay').textContent = latStr;
+    document.getElementById('lonDisplay').textContent = lonStr;
+    document.getElementById('latInput').value = currentLat;
+    document.getElementById('lonInput').value = currentLon;
+    document.getElementById('manualLat').value = latStr;
+    document.getElementById('manualLon').value = lonStr;
+    document.getElementById('infoLat').textContent = latStr;
+    document.getElementById('infoLon').textContent = lonStr;
+
+    refreshMapPreview();
+    if (autoSave) saveToServer(currentLat, currentLon, currentRadius);
+}
+
+// ─── GOOGLE MAPS LINK PARSER ──────────────────────────────────────────────────
+// Handles ALL Google Maps URL formats + plain "lat, lon" text
+function parseGoogleMapsLink() {
+    const raw    = document.getElementById('googleMapsLink').value.trim();
+    const field  = document.getElementById('googleMapsLink');
+    const status = document.getElementById('linkStatus');
+
+    if (!raw) {
+        status.innerHTML = '<span style="color:#ef4444;">Paste a Google Maps link or coordinates first.</span>';
+        return;
+    }
+
+    let lat = null, lon = null;
+
+    // --- Pattern 1: ?q=LAT,LON  (your example: ?q=10.062903,76.347862)
+    let m = raw.match(/[?&]q=(-?\d{1,3}\.\d+)[,+](-?\d{1,3}\.\d+)/);
+    if (m) { lat = parseFloat(m[1]); lon = parseFloat(m[2]); }
+
+    // --- Pattern 2: @LAT,LON,zoom  (place URLs)
+    if (!lat) {
+        m = raw.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+        if (m) { lat = parseFloat(m[1]); lon = parseFloat(m[2]); }
+    }
+
+    // --- Pattern 3: ll=LAT,LON
+    if (!lat) {
+        m = raw.match(/ll=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+        if (m) { lat = parseFloat(m[1]); lon = parseFloat(m[2]); }
+    }
+
+    // --- Pattern 4: /place/Name/@LAT,LON
+    if (!lat) {
+        m = raw.match(/\/place\/[^@]*@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+        if (m) { lat = parseFloat(m[1]); lon = parseFloat(m[2]); }
+    }
+
+    // --- Pattern 5: plain "LAT, LON" or "LAT LON" text (copied from Google Maps right-click)
+    if (!lat) {
+        m = raw.match(/^(-?\d{1,3}\.\d+)\s*[,\s]\s*(-?\d{1,3}\.\d+)$/);
+        if (m) { lat = parseFloat(m[1]); lon = parseFloat(m[2]); }
+    }
+
+    // --- Pattern 6: any two decimal numbers in the string (fallback)
+    if (!lat) {
+        const nums = raw.match(/-?\d{1,3}\.\d{4,}/g);
+        if (nums && nums.length >= 2) {
+            lat = parseFloat(nums[0]);
+            lon = parseFloat(nums[1]);
+        }
+    }
+
+    // Validate
+    if (lat !== null && lon !== null &&
+        lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        field.className = 'paste-field ok';
+        status.innerHTML = `<span style="color:#166534;">
+            ✓ Found coordinates: <strong>${lat.toFixed(6)}, ${lon.toFixed(6)}</strong>
+        </span>`;
+        applyCoords(lat, lon, true);
+        setTimeout(() => {
+            status.innerHTML = `<span style="color:#166534;">✓ Location saved!</span>`;
+        }, 1500);
+    } else {
+        field.className = 'paste-field err';
+        status.innerHTML = `<span style="color:#ef4444;">
+            ✗ Could not read coordinates from this link.<br>
+            Try: Right-click your office on Google Maps → click the coordinates at the top → paste here.
+        </span>`;
+    }
+}
+
+// Auto-parse when pasting
+document.getElementById('googleMapsLink').addEventListener('paste', function() {
+    setTimeout(parseGoogleMapsLink, 150);
+});
+document.getElementById('googleMapsLink').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); parseGoogleMapsLink(); }
+    this.className = 'paste-field';
+    document.getElementById('linkStatus').innerHTML = '';
+});
+
+// ─── MANUAL COORDINATES ───────────────────────────────────────────────────────
+function applyManualCoords() {
+    // Use text inputs — no step validation issue
+    const latVal = document.getElementById('manualLat').value.trim();
+    const lonVal = document.getElementById('manualLon').value.trim();
+    const lat = parseFloat(latVal);
+    const lon = parseFloat(lonVal);
+
+    if (isNaN(lat) || isNaN(lon)) {
+        alert('Please enter valid numbers.\nExample Latitude: 10.062903\nExample Longitude: 76.347862');
+        return;
+    }
+    if (lat < -90 || lat > 90) {
+        alert('Latitude must be between -90 and 90.\nYour value: ' + lat);
+        return;
+    }
+    if (lon < -180 || lon > 180) {
+        alert('Longitude must be between -180 and 180.\nYour value: ' + lon);
+        return;
+    }
+    applyCoords(lat, lon, true);
+    showToast('✓ Coordinates applied: ' + lat.toFixed(6) + ', ' + lon.toFixed(6));
+}
+
+// ─── CURRENT GPS LOCATION ─────────────────────────────────────────────────────
+function useMyLocation() {
+    const status = document.getElementById('gpsStatus');
+    status.innerHTML = '<span class="text-muted"><i class="bi bi-hourglass-split me-1"></i>Getting your GPS... allow location permission if asked.</span>';
+
+    if (!navigator.geolocation) {
+        status.innerHTML = '<span class="text-danger">GPS not supported in this browser.</span>';
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            const acc = Math.round(pos.coords.accuracy);
+            applyCoords(lat, lon, true);
+            status.innerHTML = `<span class="text-success">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                Location set! (accuracy ±${acc}m)
+                ${acc > 100 ? '<br><small class="text-warning">Low accuracy — GPS works best outdoors.</small>' : ''}
+            </span>`;
+        },
+        function(err) {
+            let msg = 'Could not get location.';
+            if (err.code === 1) msg = 'Permission denied — please allow location in your browser settings.';
+            if (err.code === 2) msg = 'Location unavailable — try again outdoors.';
+            if (err.code === 3) msg = 'Timed out — please try again.';
+            status.innerHTML = `<span class="text-danger">
+                <i class="bi bi-x-circle-fill me-1"></i>${msg}
+            </span>`;
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+}
+
+// ─── RADIUS SLIDER ────────────────────────────────────────────────────────────
+function updateRadius(val) {
+    currentRadius = parseInt(val);
+    document.getElementById('radiusLabel').textContent = val + 'm';
+    document.getElementById('infoRadius').textContent  = val + 'm';
+    const pct = ((currentRadius - 50) / (1000 - 50) * 100).toFixed(1);
+    document.getElementById('radiusSlider').style.setProperty('--pct', pct + '%');
+    saveToServer(currentLat, currentLon, currentRadius);
+}
+
+// ─── SAVE TO SERVER ───────────────────────────────────────────────────────────
+let saveTimer = null;
+function saveToServer(lat, lon, radius) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function() {
+        fetch('/dashboard/settings/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ latitude: lat, longitude: lon, radius: radius })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            showToast(data.success ? '✓ ' + data.message : '⚠ ' + data.message);
+        })
+        .catch(function() { showToast('⚠ Could not save. Check your connection.'); });
+    }, 500);
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+    const t = document.getElementById('saveToast');
+    document.getElementById('toastMsg').textContent = msg;
+    t.style.display = 'flex';
+    setTimeout(function() { t.style.display = 'none'; }, 3500);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+(function init() {
+    // Set slider gradient
+    const pct = ((currentRadius - 50) / (1000 - 50) * 100).toFixed(1);
+    document.getElementById('radiusSlider').style.setProperty('--pct', pct + '%');
+    // Load map preview
+    refreshMapPreview();
+})();
+</script>
+{% endblock %}
