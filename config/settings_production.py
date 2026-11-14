@@ -1,5 +1,6 @@
 """
 Production settings for Railway deployment.
+Uses Cloudinary for permanent media file storage (QR codes, face photos, employee photos).
 """
 from .settings import *
 import os
@@ -17,15 +18,34 @@ if database_url:
         'default': dj_database_url.parse(database_url, conn_max_age=600)
     }
 
-# ─── STATIC FILES ─────────────────────────────────────────────────────────────
+# ─── STATIC FILES (WhiteNoise) ────────────────────────────────────────────────
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# ─── MEDIA ────────────────────────────────────────────────────────────────────
-MEDIA_ROOT = BASE_DIR / 'media'
+# ─── CLOUDINARY MEDIA STORAGE ────────────────────────────────────────────────
+# Cloudinary stores QR codes, face photos, employee photos permanently.
+# Even after Railway redeploys, all files are safe on Cloudinary.
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
 
-# ─── CSRF — allow Railway domain ──────────────────────────────────────────────
+if CLOUDINARY_URL:
+    import cloudinary
+    import cloudinary.uploader
+    import cloudinary.api
+
+    # Parse CLOUDINARY_URL automatically
+    cloudinary.config(cloudinary_url=CLOUDINARY_URL)
+
+    INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
+
+    DEFAULT_FILE_STORAGE  = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    MEDIA_URL = '/media/'
+else:
+    # Fallback to local if CLOUDINARY_URL not set
+    MEDIA_ROOT = BASE_DIR / 'media'
+    MEDIA_URL  = '/media/'
+
+# ─── CSRF ─────────────────────────────────────────────────────────────────────
 CSRF_TRUSTED_ORIGINS = [
     'https://office-hrms-production.up.railway.app',
     'https://*.up.railway.app',
