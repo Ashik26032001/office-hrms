@@ -1,13 +1,16 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from accounts.models import CustomUser
 from .models import Employee, Department, Shift
 from .forms import EmployeeCreateForm, EmployeeEditForm, DepartmentForm, ShiftForm
 from attendance.models import AttendanceEvent
 from django.utils import timezone
 from django.db.models import Q
+import qrcode
+import io
 
 
 def hr_required(view_func):
@@ -20,6 +23,41 @@ def hr_required(view_func):
             return redirect('/employee/dashboard/')
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+# ─── DYNAMIC QR CODE VIEW ─────────────────────────────────────────────────────
+@login_required
+def employee_qr_image(request, pk):
+    """
+    Generates QR code image on the fly from the employee's qr_token.
+    This works on any server including Railway where media files don't persist.
+    Only the employee themselves or HR/Admin can access their QR.
+    """
+    emp = get_object_or_404(Employee, pk=pk)
+
+    # Security: employee can only see their own QR; HR/Admin can see all
+    if not request.user.is_admin_or_hr():
+        try:
+            if request.user.employee_profile.pk != emp.pk:
+                return HttpResponse('Forbidden', status=403)
+        except Exception:
+            return HttpResponse('Forbidden', status=403)
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(str(emp.qr_token))
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#1e3a5f", back_color="white")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+
+    return HttpResponse(buffer.read(), content_type='image/png')
 
 
 @hr_required

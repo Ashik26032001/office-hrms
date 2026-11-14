@@ -9,6 +9,7 @@ urlpatterns = [
     path('<int:pk>/detail/', views.employee_detail, name='employee_detail'),
     path('<int:pk>/delete/', views.employee_delete, name='employee_delete'),
     path('<int:pk>/regenerate-qr/', views.regenerate_qr, name='regenerate_qr'),
+    path('<int:pk>/qr.png',         views.employee_qr_image, name='employee_qr_image'),
 
     # Fingerprint management
     path('<int:pk>/fingers/', views.finger_management, name='finger_management'),

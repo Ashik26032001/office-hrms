@@ -142,24 +142,20 @@
                 <h6 class="mb-0 fw-bold"><i class="bi bi-qr-code me-2"></i>Employee QR Code</h6>
             </div>
             <div class="card-body text-center">
-                {% if emp.qr_image %}
-                <img src="{{ emp.qr_image.url }}" alt="QR Code" style="max-width:160px; border-radius:8px;">
+                <img src="{% url 'employee_qr_image' emp.pk %}" alt="QR Code"
+                     style="max-width:160px; border-radius:8px;">
                 <div class="mt-2 text-muted" style="font-size:11px;">Token: {{ emp.qr_token }}</div>
                 <div class="d-flex gap-2 mt-3">
-                    <a href="{{ emp.qr_image.url }}" download="qr_{{ emp.employee_id }}.png"
+                    <a href="{% url 'employee_qr_image' emp.pk %}" download="qr_{{ emp.employee_id }}.png"
                        class="btn btn-outline-primary flex-grow-1 btn-sm">
                         <i class="bi bi-download me-1"></i>Download
                     </a>
-                    <a href="{% url 'regenerate_qr' emp.pk %}" 
+                    <a href="{% url 'regenerate_qr' emp.pk %}"
                        class="btn btn-outline-warning flex-grow-1 btn-sm"
                        onclick="return confirm('Regenerate QR? Old QR will stop working.')">
                         <i class="bi bi-arrow-repeat me-1"></i>Regenerate
                     </a>
                 </div>
-                {% else %}
-                <div class="text-muted py-3">No QR generated</div>
-                <a href="{% url 'regenerate_qr' emp.pk %}" class="btn btn-primary btn-sm">Generate QR</a>
-                {% endif %}
             </div>
         </div>
     </div>
