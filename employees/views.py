@@ -11,6 +11,24 @@ from django.utils import timezone
 from django.db.models import Q
 import qrcode
 import io
+import base64
+
+
+def generate_qr_base64(qr_token):
+    """Generate QR code and return as base64 string for inline HTML use."""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(str(qr_token))
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#1e3a5f", back_color="white")
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    return base64.b64encode(buffer.read()).decode('utf-8')
 
 
 def hr_required(view_func):
@@ -170,6 +188,7 @@ def employee_detail(request, pk):
         'emp': emp,
         'recent_events': recent_events,
         'live_status': live_status,
+        'qr_b64': generate_qr_base64(emp.qr_token),
     }
     return render(request, 'employees/employee_detail.html', context)
 
@@ -344,5 +363,6 @@ def employee_self_dashboard(request):
         'total_minutes_rem': minutes,
         'recent_events': recent_events,
         'today': today,
+        'qr_b64': generate_qr_base64(emp.qr_token),
     }
     return render(request, 'employees/employee_dashboard.html', context)
