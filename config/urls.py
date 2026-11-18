@@ -24,6 +24,9 @@ urlpatterns = [
     path('attendance/', include('attendance.urls')),
     path('reports/',    include('reports.urls')),
     path('employee/',   include('employees.urls')),
+    path('work/',       include('work_progress.urls')),
+    path('meetings/',   include('meetings.urls')),
+    path('ai/',         include('ai_assistant.urls')),
 
     # PWA
     path('sw.js',   service_worker,                                    name='service_worker'),

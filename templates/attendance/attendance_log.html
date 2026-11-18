@@ -22,27 +22,31 @@
 <!-- Stats Row -->
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-3">
-        <div class="card text-center py-3">
-            <div class="fs-2 fw-bold text-primary">{{ total_employees }}</div>
-            <small class="text-muted">Total Employees</small>
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="kpi-value">{{ total_employees }}</div>
+            <div class="kpi-label">Total Employees</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="card text-center py-3">
-            <div class="fs-2 fw-bold text-success">{{ present_count }}</div>
-            <small class="text-muted">Present Today</small>
+        <div class="kpi-card kpi-green">
+            <div class="kpi-icon"><i class="bi bi-person-check-fill"></i></div>
+            <div class="kpi-value">{{ present_count }}</div>
+            <div class="kpi-label">Present Today</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="card text-center py-3">
-            <div class="fs-2 fw-bold text-info">{{ in_count }}</div>
-            <small class="text-muted">Currently IN</small>
+        <div class="kpi-card kpi-teal">
+            <div class="kpi-icon"><i class="bi bi-box-arrow-in-right"></i></div>
+            <div class="kpi-value">{{ in_count }}</div>
+            <div class="kpi-label">Currently IN</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="card text-center py-3">
-            <div class="fs-2 fw-bold text-danger">{{ total_employees|add:"-"|add:present_count }}</div>
-            <small class="text-muted">Absent</small>
+        <div class="kpi-card kpi-red">
+            <div class="kpi-icon"><i class="bi bi-person-x-fill"></i></div>
+            <div class="kpi-value">{{ absent_count }}</div>
+            <div class="kpi-label">Absent</div>
         </div>
     </div>
 </div>

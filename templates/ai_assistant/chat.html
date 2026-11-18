@@ -1,0 +1,592 @@
+{% extends 'base.html' %}
+{% block title %}SmartHR AI Assistant{% endblock %}
+{% block page_title %}AI Assistant{% endblock %}
+{% block nav_ai %}active{% endblock %}
+{% block nav_ai_hr %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Layout ── */
+.ai-wrapper {
+    display: flex;
+    gap: 20px;
+    height: calc(100vh - var(--topbar-height) - 48px);
+    max-height: 860px;
+}
+
+/* ── Sidebar ── */
+.ai-sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.ai-sidebar-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    padding: 16px;
+}
+.ai-sidebar-card h6 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-muted); font-weight: 700; margin-bottom: 10px;
+}
+.suggestion-btn {
+    display: block; width: 100%;
+    text-align: left; background: #f8fafc;
+    border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; color: #374151;
+    cursor: pointer; transition: all 0.15s; margin-bottom: 6px;
+    font-weight: 500;
+}
+.suggestion-btn:hover {
+    background: #e0f7fe; border-color: var(--accent); color: var(--accent);
+}
+.engine-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.engine-ollama { background: #dcfce7; color: #166534; }
+.engine-rule   { background: #dbeafe; color: #1d4ed8; }
+
+/* ── Chat Panel ── */
+.ai-chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* ── Chat Header ── */
+.chat-header {
+    background: linear-gradient(135deg, #0d1b2e 0%, #1e3a5f 50%, #0077b6 100%);
+    padding: 18px 24px;
+    display: flex; align-items: center; gap: 14px;
+    flex-shrink: 0;
+    position: relative; overflow: hidden;
+}
+.chat-header::after {
+    content: '';
+    position: absolute; right: -30px; top: -30px;
+    width: 120px; height: 120px; border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+}
+.ai-avatar {
+    width: 44px; height: 44px; border-radius: 14px;
+    background: linear-gradient(135deg, #00b4d8, #0077b6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0,180,216,0.4);
+}
+.chat-header h5 { font-size: 16px; font-weight: 700; color: white; margin: 0; }
+.chat-header p  { font-size: 11px; color: rgba(255,255,255,0.6); margin: 2px 0 0; }
+.online-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.3);
+    animation: pulse-green 1.5s infinite;
+    flex-shrink: 0;
+}
+.engine-status {
+    margin-left: auto; font-size: 11px; font-weight: 600;
+    padding: 4px 12px; border-radius: 20px; flex-shrink: 0;
+}
+.status-ollama { background: rgba(34,197,94,0.2); color: #4ade80; }
+.status-smart  { background: rgba(0,180,216,0.2); color: #67e8f9; }
+
+/* ── Messages area ── */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+    background: #f8fafc;
+}
+.chat-messages::-webkit-scrollbar { width: 4px; }
+.chat-messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+
+/* Message bubbles */
+.msg-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: fadeUp 0.3s ease;
+}
+.msg-row.user-row { flex-direction: row-reverse; }
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; flex-shrink: 0;
+}
+.msg-avatar.ai  { background: linear-gradient(135deg, #0d1b2e, #0077b6); color: white; font-size: 17px; }
+.msg-avatar.usr { background: linear-gradient(135deg, #1e3a5f, #00b4d8); color: white; font-size: 13px; }
+
+.msg-bubble {
+    max-width: 72%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.65;
+}
+.msg-bubble.ai-bubble {
+    background: white;
+    color: #1a2535;
+    border-radius: 4px 16px 16px 16px;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.07);
+}
+.msg-bubble.user-bubble {
+    background: linear-gradient(135deg, #1e3a5f, #0077b6);
+    color: white;
+    border-radius: 16px 4px 16px 16px;
+}
+.msg-bubble.ai-bubble strong  { color: var(--primary); }
+.msg-bubble.user-bubble strong { color: #90e0ef; }
+.msg-time {
+    font-size: 10px; color: var(--text-muted); margin-top: 4px;
+    text-align: right;
+}
+.msg-row.user-row .msg-time { text-align: left; }
+
+/* Typing indicator */
+.typing-indicator {
+    display: none;
+    align-items: center; gap: 10px;
+}
+.typing-indicator.show { display: flex; }
+.typing-dots {
+    display: flex; gap: 4px; padding: 10px 16px;
+    background: white; border-radius: 4px 16px 16px 16px;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.07);
+}
+.typing-dots span {
+    width: 8px; height: 8px; border-radius: 50%; background: #9ca3af;
+    animation: bounce 1.4s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-8px); }
+}
+
+/* Welcome card */
+.welcome-card {
+    background: linear-gradient(135deg, #f0fdff, #e0f7fe);
+    border: 1px solid #bae6fd;
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 8px;
+}
+.welcome-card h6 { font-weight: 700; color: var(--primary); margin-bottom: 8px; font-size: 14px; }
+.welcome-chip {
+    display: inline-block;
+    background: white; border: 1px solid #bae6fd;
+    border-radius: 20px; padding: 4px 12px;
+    font-size: 12px; color: #0077b6; margin: 3px;
+    cursor: pointer; transition: all 0.15s; font-weight: 500;
+}
+.welcome-chip:hover { background: #0077b6; color: white; }
+
+/* ── Input area ── */
+.chat-input-area {
+    padding: 14px 20px;
+    background: white;
+    border-top: 1px solid #f3f4f6;
+    flex-shrink: 0;
+}
+.input-row {
+    display: flex; gap: 10px; align-items: flex-end;
+}
+.chat-textarea {
+    flex: 1;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 11px 16px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    resize: none;
+    max-height: 120px;
+    transition: border-color 0.2s;
+    background: #f8fafc;
+    color: #1a2535;
+    line-height: 1.5;
+}
+.chat-textarea:focus { outline: none; border-color: var(--accent); background: white; }
+.send-btn {
+    width: 44px; height: 44px; border-radius: 12px; border: none;
+    background: linear-gradient(135deg, var(--accent), #0077b6);
+    color: white; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+}
+.send-btn:hover   { opacity: 0.9; transform: scale(1.05); }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.input-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+/* Markdown rendering */
+.ai-bubble ul  { padding-left: 18px; margin: 6px 0; }
+.ai-bubble li  { margin: 3px 0; }
+.ai-bubble p   { margin: 4px 0; }
+.ai-bubble code { background: #f3f4f6; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+
+/* Mobile */
+@media (max-width: 768px) {
+    .ai-wrapper { flex-direction: column; height: auto; max-height: none; }
+    .ai-sidebar { width: 100%; }
+    .chat-messages { max-height: 400px; }
+    .msg-bubble { max-width: 90%; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ai-wrapper">
+
+    <!-- ── Sidebar ── -->
+    <div class="ai-sidebar">
+
+        <!-- Engine status -->
+        <div class="ai-sidebar-card">
+            <h6>Engine</h6>
+            {% if ollama_up %}
+            <div class="engine-badge engine-ollama mb-2">
+                <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span>
+                Ollama AI — Online
+            </div>
+            {% if models %}
+            <select id="modelSelect" class="form-select form-select-sm mt-2" style="font-size:12px;">
+                {% for m in models %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+            </select>
+            {% endif %}
+            <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+                Running locally · no API key needed
+            </div>
+            {% else %}
+            <div class="engine-badge engine-rule mb-2">
+                <span style="width:7px;height:7px;border-radius:50%;background:#3b82f6;"></span>
+                Smart Rule Engine
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                Answering from live database. Install <strong>Ollama</strong> for natural language AI.
+            </div>
+            <a href="https://ollama.com/download" target="_blank"
+               style="font-size:11px;color:var(--accent);font-weight:600;display:block;margin-top:6px;">
+                Get Ollama →
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Suggested questions -->
+        <div class="ai-sidebar-card" style="flex:1;overflow-y:auto;">
+            <h6>Quick Questions</h6>
+            {% if user_role == 'employee' %}
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">📅 How many days did I attend this month?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">✅ What tasks are pending for me?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">📋 When is my next meeting?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">🕐 Am I checked in today?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">🗂️ Show my project summary</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">📊 Show my attendance summary</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">🔔 How many unread notifications do I have?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">👤 Show my profile details</button>
+            {% else %}
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">👥 How many employees are present today?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">⚠️ Who has frequent late arrivals?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">📋 Who has pending tasks?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">🗂️ Which projects are delayed?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">📅 What meetings are upcoming?</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">🏢 Show department-wise attendance</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">📊 Generate monthly attendance report</button>
+            <button class="suggestion-btn" onclick="sendSuggestion(this)">👥 How many total employees are there?</button>
+            {% endif %}
+        </div>
+
+        <!-- New chat -->
+        <button class="btn btn-light w-100" style="border-radius:12px;font-size:13px;" onclick="newChat()">
+            <i class="bi bi-plus-circle me-1"></i> New Conversation
+        </button>
+    </div>
+
+    <!-- ── Chat Panel ── -->
+    <div class="ai-chat-panel">
+
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="ai-avatar">🤖</div>
+            <div>
+                <h5>SmartHR AI Assistant</h5>
+                <p>Powered by live database · {% if ollama_up %}Ollama LLM{% else %}Smart Rule Engine{% endif %}</p>
+            </div>
+            <div class="online-dot"></div>
+            <div class="engine-status {% if ollama_up %}status-ollama{% else %}status-smart{% endif %}" id="engineStatus">
+                {% if ollama_up %}🟢 Ollama Online{% else %}🔵 Smart Engine{% endif %}
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="chatMessages">
+
+            <!-- Welcome -->
+            <div class="welcome-card" id="welcomeCard">
+                <h6>👋 Hello, {{ request.user.get_full_name|default:request.user.username }}!</h6>
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">
+                    I'm your SmartHR AI Assistant. I can answer questions about your
+                    {% if user_role == 'employee' %}attendance, tasks, meetings, and work progress{% else %}employees, attendance, tasks, projects, and meetings{% endif %}
+                    — all from live data.
+                </p>
+                <div>
+                    {% if user_role == 'employee' %}
+                    <span class="welcome-chip" onclick="sendSuggestion(this)">📅 My attendance this month</span>
+                    <span class="welcome-chip" onclick="sendSuggestion(this)">✅ Pending tasks</span>
+                    <span class="welcome-chip" onclick="sendSuggestion(this)">📋 Next meeting</span>
+                    <span class="welcome-chip" onclick="sendSuggestion(this)">🕐 Am I checked in?</span>
+                    {% else %}
+                    <span class="welcome-chip" onclick="sendSuggestion(this)">👥 Present today</span>
+                    <span class="welcome-chip" onclick="sendSuggestion(this)">⚠️ Late arrivals</span>
+                    <span class="welcome-chip" onclick="sendSuggestion(this)">📋 Pending tasks</span>
+                    <span class="welcome-chip" onclick="sendSuggestion(this)">🗂️ Delayed projects</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Load existing history -->
+            {% for msg in history %}
+            <div class="msg-row {% if msg.role == 'user' %}user-row{% endif %}">
+                <div class="msg-avatar {% if msg.role == 'user' %}usr{% else %}ai{% endif %}">
+                    {% if msg.role == 'user' %}{{ request.user.get_full_name|first|upper|default:"U" }}{% else %}🤖{% endif %}
+                </div>
+                <div>
+                    <div class="msg-bubble {% if msg.role == 'user' %}user-bubble{% else %}ai-bubble{% endif %}">
+                        {% if msg.role == 'assistant' %}
+                        <div class="ai-content" data-raw="{{ msg.content|escapejs }}"></div>
+                        {% else %}{{ msg.content }}{% endif %}
+                    </div>
+                    <div class="msg-time">{{ msg.created_at|date:"h:i A" }}</div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Typing indicator -->
+            <div class="msg-row typing-indicator" id="typingIndicator">
+                <div class="msg-avatar ai">🤖</div>
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="chat-input-area">
+            <div class="input-row">
+                <textarea
+                    id="chatInput"
+                    class="chat-textarea"
+                    placeholder="Ask me anything about your HR data…"
+                    rows="1"
+                    onkeydown="handleKey(event)"
+                    oninput="autoResize(this)"
+                ></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </div>
+            <div class="input-hint">
+                Press <strong>Enter</strong> to send &nbsp;·&nbsp; <strong>Shift+Enter</strong> for new line
+                &nbsp;·&nbsp; Answers from live database
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+const CSRF = '{{ csrf_token }}';
+let sessionId = {% if session %}{{ session.pk }}{% else %}null{% endif %};
+const userInitial = '{{ request.user.get_full_name|first|upper|default:"U" }}';
+const isLoading = { value: false };
+
+// ── Render markdown-ish text ──────────────────────────────────────────────
+function renderMarkdown(text) {
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+        .replace(/\n{2,}/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/^/, '<p>').replace(/$/, '</p>')
+        .replace(/<p><\/p>/g, '');
+}
+
+// ── Render any .ai-content elements in existing history ───────────────────
+document.querySelectorAll('.ai-content').forEach(el => {
+    el.innerHTML = renderMarkdown(el.dataset.raw || '');
+});
+
+// ── Auto-resize textarea ──────────────────────────────────────────────────
+function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ── Handle Enter key ──────────────────────────────────────────────────────
+function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+}
+
+// ── Add a message bubble to the UI ───────────────────────────────────────
+function addBubble(role, content, animate = true) {
+    const container = document.getElementById('chatMessages');
+    const typing    = document.getElementById('typingIndicator');
+
+    const row = document.createElement('div');
+    row.className = `msg-row${role === 'user' ? ' user-row' : ''}${animate ? '' : ''}`;
+
+    const avatarContent = role === 'user' ? userInitial : '🤖';
+    const avatarClass   = role === 'user' ? 'usr' : 'ai';
+    const bubbleClass   = role === 'user' ? 'user-bubble' : 'ai-bubble';
+
+    const now = new Date();
+    const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    row.innerHTML = `
+        <div class="msg-avatar ${avatarClass}">${avatarContent}</div>
+        <div>
+            <div class="msg-bubble ${bubbleClass}">
+                ${role === 'assistant' ? renderMarkdown(content) : escapeHtml(content)}
+            </div>
+            <div class="msg-time">${time}</div>
+        </div>`;
+
+    container.insertBefore(row, typing);
+    scrollBottom();
+    return row;
+}
+
+function escapeHtml(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function scrollBottom() {
+    const c = document.getElementById('chatMessages');
+    setTimeout(() => c.scrollTop = c.scrollHeight, 50);
+}
+
+// ── Send message ──────────────────────────────────────────────────────────
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const text  = input.value.trim();
+    if (!text || isLoading.value) return;
+
+    // Hide welcome card
+    const wc = document.getElementById('welcomeCard');
+    if (wc) wc.style.display = 'none';
+
+    // Show user bubble
+    addBubble('user', text);
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Show typing
+    isLoading.value = true;
+    document.getElementById('sendBtn').disabled = true;
+    document.getElementById('typingIndicator').classList.add('show');
+    scrollBottom();
+
+    const model = document.getElementById('modelSelect')?.value || 'llama3.2';
+
+    try {
+        const resp = await fetch('/ai/send/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ message: text, session_id: sessionId, model }),
+        });
+        const data = await resp.json();
+
+        document.getElementById('typingIndicator').classList.remove('show');
+
+        if (data.reply) {
+            sessionId = data.session_id;
+            addBubble('assistant', data.reply);
+
+            // Update engine status
+            const es = document.getElementById('engineStatus');
+            if (data.engine === 'ollama') {
+                es.className = 'engine-status status-ollama';
+                es.textContent = '🟢 Ollama Online';
+            } else {
+                es.className = 'engine-status status-smart';
+                es.textContent = '🔵 Smart Engine';
+            }
+        } else {
+            addBubble('assistant', '⚠️ ' + (data.error || 'Something went wrong. Try again.'));
+        }
+    } catch (err) {
+        document.getElementById('typingIndicator').classList.remove('show');
+        addBubble('assistant', '⚠️ Network error. Please check your connection and try again.');
+    }
+
+    isLoading.value = false;
+    document.getElementById('sendBtn').disabled = false;
+    document.getElementById('chatInput').focus();
+}
+
+// ── Suggestion chips / buttons ────────────────────────────────────────────
+function sendSuggestion(el) {
+    const q = el.textContent.replace(/^[^\s]+\s/, '').trim();
+    document.getElementById('chatInput').value = q;
+    sendMessage();
+}
+
+// ── New conversation ──────────────────────────────────────────────────────
+async function newChat() {
+    if (!confirm('Start a new conversation? This will clear the current chat.')) return;
+    const resp = await fetch('/ai/new-session/', {
+        method: 'POST', headers: { 'X-CSRFToken': CSRF }
+    });
+    const data = await resp.json();
+    sessionId = data.session_id;
+    // Clear messages (keep typing indicator + welcome)
+    const container = document.getElementById('chatMessages');
+    container.querySelectorAll('.msg-row:not(#typingIndicator)').forEach(el => el.remove());
+    const wc = document.getElementById('welcomeCard');
+    if (wc) wc.style.display = '';
+}
+
+// ── Poll Ollama status every 30 s ─────────────────────────────────────────
+setInterval(async () => {
+    try {
+        const r = await fetch('/ai/status/');
+        const d = await r.json();
+        const es = document.getElementById('engineStatus');
+        if (d.available) {
+            es.className = 'engine-status status-ollama';
+            es.textContent = '🟢 Ollama Online';
+        }
+    } catch {}
+}, 30000);
+
+// ── Init ──────────────────────────────────────────────────────────────────
+document.getElementById('chatInput').focus();
+scrollBottom();
+</script>
+{% endblock %}

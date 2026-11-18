@@ -1,0 +1,489 @@
+{% extends 'base.html' %}
+{% block title %}{{ project.name }} — Board{% endblock %}
+{% block page_title %}{{ project.name }}{% endblock %}
+{% block nav_my_work %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Kanban layout ── */
+.kanban-board { display:flex; gap:16px; overflow-x:auto; padding-bottom:20px; align-items:flex-start; }
+.kanban-column {
+    flex: 0 0 280px;
+    border-radius:14px;
+    background:#f8fafc;
+    border:1.5px solid #e5e7eb;
+    display:flex; flex-direction:column;
+    min-height:400px;
+}
+.kanban-column.drag-over { border-color:var(--accent); background:#f0fdff; }
+.col-header {
+    padding:14px 16px;
+    border-bottom:1.5px solid #e5e7eb;
+    display:flex; align-items:center; gap:8px;
+    border-radius:14px 14px 0 0;
+}
+.col-header .col-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; }
+.col-count { margin-left:auto; min-width:22px; height:22px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
+.col-body { padding:12px; flex:1; display:flex; flex-direction:column; gap:10px; min-height:200px; }
+
+/* ── Task Card ── */
+.task-card {
+    background:white;
+    border-radius:10px;
+    padding:14px;
+    box-shadow:0 1px 6px rgba(0,0,0,0.07);
+    border-left:3px solid transparent;
+    cursor:grab;
+    transition:box-shadow 0.2s, transform 0.15s;
+    position:relative;
+}
+.task-card:active { cursor:grabbing; }
+.task-card.dragging { opacity:0.5; transform:scale(0.97); box-shadow:0 8px 24px rgba(0,0,0,0.15); }
+.task-card.priority-high { border-left-color:#ef4444; }
+.task-card.priority-medium { border-left-color:#f59e0b; }
+.task-card.priority-low { border-left-color:#22c55e; }
+.task-card.overdue-card { background:#fff5f5; }
+
+.task-title { font-size:13px; font-weight:600; color:#1a2535; margin-bottom:6px; line-height:1.4; }
+.task-meta { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+.task-tag { font-size:10px; border-radius:4px; padding:2px 7px; font-weight:600; }
+.tag-high { background:#fee2e2; color:#991b1b; }
+.tag-medium { background:#fef3c7; color:#92400e; }
+.tag-low { background:#dcfce7; color:#166534; }
+.tag-overdue { background:#fee2e2; color:#991b1b; }
+.tag-date { background:#f3f4f6; color:#374151; }
+
+.task-actions { position:absolute; top:8px; right:8px; display:flex; gap:4px; opacity:0; transition:opacity 0.2s; }
+.task-card:hover .task-actions { opacity:1; }
+.task-action-btn { width:24px; height:24px; border-radius:6px; border:none; display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; }
+.btn-edit-task { background:#e0f2fe; color:#0369a1; }
+.btn-del-task { background:#fee2e2; color:#991b1b; }
+
+/* ── Column colors ── */
+.col-todo .col-header { background:#f9fafb; }
+.col-todo .col-count { background:#f3f4f6; color:#374151; }
+.col-open .col-header { background:#eff6ff; }
+.col-open .col-count { background:#dbeafe; color:#1d4ed8; }
+.col-review .col-header { background:#fffbeb; }
+.col-review .col-count { background:#fef3c7; color:#92400e; }
+.col-done .col-header { background:#f0fdf4; }
+.col-done .col-count { background:#dcfce7; color:#166534; }
+
+/* ── Empty state ── */
+.col-empty { text-align:center; padding:20px 10px; color:var(--text-muted); font-size:12px; }
+
+@media (max-width: 768px) {
+    .kanban-column { flex: 0 0 260px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-kanban-fill me-2" style="color:var(--accent)"></i>{{ project.name }}</h4>
+        <p>
+            {% if project.start_date or project.end_date %}
+            <i class="bi bi-calendar3 me-1"></i>{{ project.start_date|default:"—" }} → {{ project.end_date|default:"—" }}
+            &nbsp;·&nbsp;
+            {% endif %}
+            Drag tasks between columns to update status
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+            <i class="bi bi-plus-lg me-1"></i> New Task
+        </button>
+        {% if request.user.is_admin_or_hr %}
+        <a href="{% url 'hr_project_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        {% else %}
+        <a href="{% url 'employee_project_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Kanban Board -->
+<div class="kanban-board" id="kanbanBoard">
+
+    <!-- TO DO -->
+    <div class="kanban-column col-todo" data-status="todo">
+        <div class="col-header">
+            <span style="width:10px;height:10px;border-radius:50%;background:#9ca3af;"></span>
+            <span class="col-title">To Do</span>
+            <span class="col-count" id="count-todo">{{ todo_tasks.count }}</span>
+        </div>
+        <div class="col-body" id="col-todo">
+            {% for task in todo_tasks %}
+            {% include 'work_progress/_task_card.html' with task=task %}
+            {% empty %}
+            <div class="col-empty"><i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:6px;"></i>No tasks</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- OPEN -->
+    <div class="kanban-column col-open" data-status="open">
+        <div class="col-header">
+            <span style="width:10px;height:10px;border-radius:50%;background:#3b82f6;"></span>
+            <span class="col-title">Open</span>
+            <span class="col-count" id="count-open">{{ open_tasks.count }}</span>
+        </div>
+        <div class="col-body" id="col-open">
+            {% for task in open_tasks %}
+            {% include 'work_progress/_task_card.html' with task=task %}
+            {% empty %}
+            <div class="col-empty"><i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:6px;"></i>No tasks</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- UNDER REVIEW -->
+    <div class="kanban-column col-review" data-status="under_review">
+        <div class="col-header">
+            <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span>
+            <span class="col-title">Under Review</span>
+            <span class="col-count" id="count-under_review">{{ review_tasks.count }}</span>
+        </div>
+        <div class="col-body" id="col-under_review">
+            {% for task in review_tasks %}
+            {% include 'work_progress/_task_card.html' with task=task %}
+            {% empty %}
+            <div class="col-empty"><i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:6px;"></i>No tasks</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- DONE -->
+    <div class="kanban-column col-done" data-status="done">
+        <div class="col-header">
+            <span style="width:10px;height:10px;border-radius:50%;background:#22c55e;"></span>
+            <span class="col-title">Done</span>
+            <span class="col-count" id="count-done">{{ done_tasks.count }}</span>
+        </div>
+        <div class="col-body" id="col-done">
+            {% for task in done_tasks %}
+            {% include 'work_progress/_task_card.html' with task=task %}
+            {% empty %}
+            <div class="col-empty"><i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:6px;"></i>No tasks</div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ── CREATE TASK MODAL ── -->
+<div class="modal fade" id="createTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0" style="border-radius:16px; overflow:hidden;">
+            <div class="modal-header" style="background:linear-gradient(135deg,var(--primary),var(--primary-light)); color:white; border:none;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>Create New Task</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Task Title *</label>
+                        {{ form.title }}
+                        {% if form.title.errors %}<div class="text-danger" style="font-size:12px;">{{ form.title.errors }}</div>{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Description</label>
+                        {{ form.description }}
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Priority</label>
+                            {{ form.priority }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Assign To</label>
+                            {{ form.assigned_to }}
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Start Date</label>
+                            {{ form.start_date }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">End Date</label>
+                            {{ form.end_date }}
+                        </div>
+                    </div>
+                    <div class="mt-3 p-3 rounded" style="background:#f0fdf4; border:1px solid #bbf7d0;">
+                        <div style="font-size:12px; color:#166534;">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Task will be created with status <strong>To Do</strong>. Drag it to update the status.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-accent px-4">
+                        <i class="bi bi-plus-lg me-1"></i> Create Task
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── EDIT TASK MODAL ── -->
+<div class="modal fade" id="editTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0" style="border-radius:16px; overflow:hidden;">
+            <div class="modal-header" style="background:linear-gradient(135deg,#0077b6,var(--accent)); color:white; border:none;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Edit Task</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Task Title</label>
+                    <input type="text" class="form-control" id="editTitle">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Description</label>
+                    <textarea class="form-control" rows="3" id="editDescription"></textarea>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Priority</label>
+                        <select class="form-select" id="editPriority">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Assign To</label>
+                        <select class="form-select" id="editAssignedTo">
+                            <option value="">— Unassigned —</option>
+                            {% for member in project.members.all %}
+                            <option value="{{ member.pk }}">{{ member.get_full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Start Date</label>
+                        <input type="date" class="form-control" id="editStartDate">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">End Date</label>
+                        <input type="date" class="form-control" id="editEndDate">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4">
+                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-accent px-4" id="saveEditBtn">
+                    <i class="bi bi-check-lg me-1"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast notification -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999;">
+    <div id="statusToast" class="toast align-items-center border-0" role="alert" style="border-radius:10px;">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold" id="toastMsg">Status updated!</div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+let draggedCard = null;
+let editingTaskId = null;
+
+// ── Drag & Drop ───────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.task-card[draggable]').forEach(card => {
+    attachDragHandlers(card);
+});
+
+function attachDragHandlers(card) {
+    card.addEventListener('dragstart', e => {
+        draggedCard = card;
+        setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', e => {
+        card.classList.remove('dragging');
+        document.querySelectorAll('.kanban-column').forEach(col => col.classList.remove('drag-over'));
+        draggedCard = null;
+    });
+}
+
+document.querySelectorAll('.kanban-column').forEach(col => {
+    col.addEventListener('dragover', e => {
+        e.preventDefault();
+        col.classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', e => {
+        col.classList.remove('drag-over');
+    });
+    col.addEventListener('drop', e => {
+        e.preventDefault();
+        col.classList.remove('drag-over');
+        if (!draggedCard) return;
+
+        const newStatus = col.dataset.status;
+        const taskId = draggedCard.dataset.taskId;
+        const colBody = col.querySelector('.col-body');
+        const oldColId = draggedCard.dataset.currentCol;
+
+        // Don't do anything if dropped in same column
+        if (oldColId === 'col-' + newStatus) return;
+
+        // Remove empty state if present
+        const emptyEl = colBody.querySelector('.col-empty');
+        if (emptyEl) emptyEl.remove();
+
+        colBody.appendChild(draggedCard);
+
+        // If old column is now empty, add empty state
+        if (oldColId) {
+            const oldColBody = document.getElementById(oldColId);
+            if (oldColBody && oldColBody.querySelectorAll('.task-card').length === 0) {
+                oldColBody.innerHTML = '<div class="col-empty"><i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:6px;"></i>No tasks</div>';
+            }
+            updateCount(oldColId.replace('col-', ''));
+        }
+        draggedCard.dataset.currentCol = 'col-' + newStatus;
+
+        updateCount(newStatus);
+        updateTaskStatus(taskId, newStatus, draggedCard);
+    });
+});
+
+function updateCount(status) {
+    const colId = 'col-' + status;
+    const colEl = document.getElementById(colId);
+    const count = colEl ? colEl.querySelectorAll('.task-card').length : 0;
+    const countEl = document.getElementById('count-' + status);
+    if (countEl) countEl.textContent = count;
+}
+
+function updateTaskStatus(taskId, newStatus, cardEl) {
+    fetch(`/work/task/${taskId}/status/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ status: newStatus })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Task moved to ' + statusLabel(newStatus), 'success');
+            if (data.is_overdue) cardEl.classList.add('overdue-card');
+            else cardEl.classList.remove('overdue-card');
+        } else {
+            showToast('Failed to update status', 'danger');
+        }
+    })
+    .catch(() => showToast('Network error', 'danger'));
+}
+
+function statusLabel(s) {
+    return { todo: 'To Do', open: 'Open', under_review: 'Under Review', done: 'Done' }[s] || s;
+}
+
+// ── Delete Task ───────────────────────────────────────────────────────────────
+
+document.addEventListener('click', e => {
+    if (e.target.closest('.btn-del-task')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const btn = e.target.closest('.btn-del-task');
+        const taskId = btn.dataset.taskId;
+        if (!confirm('Delete this task?')) return;
+        fetch(`/work/task/${taskId}/delete/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                const colBody = card.closest('.col-body');
+                const status = card.closest('.kanban-column').dataset.status;
+                card.remove();
+                if (!colBody.querySelector('.task-card')) {
+                    colBody.innerHTML = '<div class="col-empty"><i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:6px;"></i>No tasks</div>';
+                }
+                updateCount(status);
+                showToast('Task deleted', 'success');
+            }
+        })
+        .catch(() => showToast('Network error', 'danger'));
+    }
+});
+
+// ── Edit Task ─────────────────────────────────────────────────────────────────
+
+document.addEventListener('click', e => {
+    if (e.target.closest('.btn-edit-task')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const btn = e.target.closest('.btn-edit-task');
+        editingTaskId = btn.dataset.taskId;
+        fetch(`/work/task/${editingTaskId}/edit/`)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('editTitle').value = data.title;
+                document.getElementById('editDescription').value = data.description;
+                document.getElementById('editPriority').value = data.priority;
+                document.getElementById('editStartDate').value = data.start_date;
+                document.getElementById('editEndDate').value = data.end_date;
+                document.getElementById('editAssignedTo').value = data.assigned_to;
+                new bootstrap.Modal(document.getElementById('editTaskModal')).show();
+            })
+            .catch(() => showToast('Could not load task data', 'danger'));
+    }
+});
+
+document.getElementById('saveEditBtn').addEventListener('click', () => {
+    if (!editingTaskId) return;
+    const payload = new FormData();
+    payload.append('title', document.getElementById('editTitle').value);
+    payload.append('description', document.getElementById('editDescription').value);
+    payload.append('priority', document.getElementById('editPriority').value);
+    payload.append('start_date', document.getElementById('editStartDate').value);
+    payload.append('end_date', document.getElementById('editEndDate').value);
+    payload.append('assigned_to', document.getElementById('editAssignedTo').value);
+    payload.append('csrfmiddlewaretoken', CSRF);
+
+    fetch(`/work/task/${editingTaskId}/edit/`, { method: 'POST', body: payload })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const card = document.querySelector(`.task-card[data-task-id="${editingTaskId}"]`);
+                if (card) card.querySelector('.task-title').textContent = data.title;
+                bootstrap.Modal.getInstance(document.getElementById('editTaskModal')).hide();
+                showToast('Task updated!', 'success');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast('Failed to save: ' + (data.error || 'Unknown error'), 'danger');
+            }
+        })
+        .catch(() => showToast('Network error', 'danger'));
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function showToast(msg, type) {
+    type = type || 'success';
+    const toastEl = document.getElementById('statusToast');
+    toastEl.style.background = type === 'success' ? '#dcfce7' : '#fee2e2';
+    toastEl.style.color = type === 'success' ? '#166534' : '#991b1b';
+    document.getElementById('toastMsg').textContent = msg;
+    new bootstrap.Toast(toastEl, { delay: 2500 }).show();
+}
+</script>
+{% endblock %}

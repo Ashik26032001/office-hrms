@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% block title %}{{ meeting.title }}{% endblock %}
+{% block page_title %}{{ meeting.title }}{% endblock %}
+{% block nav_meetings %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.detail-hero {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0077b6 60%, #00b4d8 100%);
+    border-radius: 20px; padding: 32px 36px; color: white;
+    position: relative; overflow: hidden; margin-bottom: 24px;
+}
+.detail-hero::after {
+    content:''; position:absolute; right:-60px; top:-60px;
+    width:220px; height:220px; border-radius:50%;
+    background:rgba(255,255,255,0.07);
+}
+.detail-hero::before {
+    content:''; position:absolute; left:50%; bottom:-80px;
+    width:160px; height:160px; border-radius:50%;
+    background:rgba(255,255,255,0.05);
+}
+.info-row {
+    display:flex; align-items:center; gap:10px;
+    padding:12px 0; border-bottom:1px solid #f3f4f6; font-size:14px;
+}
+.info-row:last-child { border-bottom:none; }
+.info-icon {
+    width:36px; height:36px; border-radius:10px;
+    background:#f0f4f8; display:flex; align-items:center;
+    justify-content:center; font-size:16px; flex-shrink:0;
+}
+.attendee-row {
+    display:flex; align-items:center; gap:12px;
+    padding:10px 0; border-bottom:1px solid #f3f4f6;
+}
+.attendee-row:last-child { border-bottom:none; }
+.rsvp-badge { font-size:10px; border-radius:20px; padding:3px 9px; font-weight:600; }
+.rsvp-accepted { background:#dcfce7; color:#166534; }
+.rsvp-declined { background:#fee2e2; color:#991b1b; }
+.rsvp-pending  { background:#fef3c7; color:#92400e; }
+.join-btn {
+    background:linear-gradient(135deg,#00b4d8,#0077b6);
+    color:white; border:none; border-radius:12px;
+    padding:14px 28px; font-size:15px; font-weight:700;
+    display:inline-flex; align-items:center; gap:8px;
+    text-decoration:none; transition:opacity 0.2s;
+}
+.join-btn:hover { color:white; opacity:0.9; }
+.agenda-box {
+    background:#f8fafc; border-radius:12px; padding:16px 20px;
+    white-space:pre-line; font-size:14px; line-height:1.8; color:#374151;
+    border-left:3px solid var(--accent);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Back -->
+<div class="mb-3">
+    <a href="{% url 'hr_meeting_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i> All Meetings</a>
+</div>
+
+<!-- Hero -->
+<div class="detail-hero">
+    <div style="position:relative;z-index:2;">
+        <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+            <span style="background:rgba(255,255,255,0.2);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;">
+                <i class="{{ meeting.type_icon }} me-1"></i>{{ meeting.get_meeting_type_display }}
+            </span>
+            <span class="badge bg-{{ meeting.status_color }} text-{{ meeting.status_color }}" style="font-size:12px;padding:5px 12px;border-radius:8px;background:rgba(255,255,255,0.2)!important;color:white!important;">
+                {{ meeting.get_status_display }}
+            </span>
+        </div>
+        <h2 style="font-size:28px;font-weight:800;margin-bottom:8px;">{{ meeting.title }}</h2>
+        {% if meeting.description %}
+        <p style="opacity:0.85;font-size:14px;max-width:600px;line-height:1.6;">{{ meeting.description }}</p>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-3 mt-3" style="font-size:13px;opacity:0.9;">
+            <span><i class="bi bi-calendar3 me-1"></i>{{ meeting.scheduled_at|date:"l, d F Y" }}</span>
+            <span><i class="bi bi-clock me-1"></i>{{ meeting.scheduled_at|date:"h:i A" }} – {{ meeting.ends_at|date:"h:i A" }}</span>
+            <span><i class="bi bi-hourglass-split me-1"></i>{{ meeting.duration_mins }} minutes</span>
+            <span><i class="bi bi-people me-1"></i>{{ attendees.count }} attendee{{ attendees.count|pluralize }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left column -->
+    <div class="col-12 col-lg-8">
+
+        <!-- Join / Link -->
+        {% if meeting.meeting_link and meeting.status != 'cancelled' %}
+        <div class="card p-4 mb-4 text-center" style="background:linear-gradient(135deg,#f0fdff,#e0f7fe);border:1px solid #bae6fd;">
+            <div style="font-size:13px;color:#0077b6;font-weight:600;margin-bottom:12px;"><i class="bi bi-camera-video-fill me-1"></i> Video Conference Link</div>
+            <a href="{{ meeting.meeting_link }}" target="_blank" class="join-btn d-inline-flex mx-auto">
+                <i class="bi bi-camera-video-fill"></i>
+                {% if meeting.status == 'ongoing' %}Join Meeting Now{% else %}Open Meeting Link{% endif %}
+            </a>
+            <div style="font-size:11px;color:#0077b6;margin-top:10px;word-break:break-all;">{{ meeting.meeting_link }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Meeting Info -->
+        <div class="card mb-4">
+            <div class="card-header"><h6 class="fw-700 mb-0"><i class="bi bi-info-circle me-2" style="color:var(--accent);"></i>Meeting Information</h6></div>
+            <div class="card-body">
+                <div class="info-row">
+                    <div class="info-icon"><i class="bi bi-calendar3" style="color:var(--accent);"></i></div>
+                    <div><div style="font-size:11px;color:var(--text-muted);font-weight:600;">DATE</div>{{ meeting.scheduled_at|date:"l, d F Y" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-icon"><i class="bi bi-clock" style="color:var(--accent);"></i></div>
+                    <div><div style="font-size:11px;color:var(--text-muted);font-weight:600;">TIME</div>{{ meeting.scheduled_at|date:"h:i A" }} – {{ meeting.ends_at|date:"h:i A" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-icon"><i class="bi bi-hourglass-split" style="color:var(--accent);"></i></div>
+                    <div><div style="font-size:11px;color:var(--text-muted);font-weight:600;">DURATION</div>{{ meeting.duration_mins }} minutes</div>
+                </div>
+                {% if meeting.location %}
+                <div class="info-row">
+                    <div class="info-icon"><i class="bi bi-geo-alt-fill" style="color:var(--accent);"></i></div>
+                    <div><div style="font-size:11px;color:var(--text-muted);font-weight:600;">LOCATION</div>{{ meeting.location }}</div>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <div class="info-icon"><i class="bi bi-person-fill" style="color:var(--accent);"></i></div>
+                    <div><div style="font-size:11px;color:var(--text-muted);font-weight:600;">SCHEDULED BY</div>{{ meeting.created_by.get_full_name|default:meeting.created_by.username }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-icon"><i class="bi bi-clock-history" style="color:var(--accent);"></i></div>
+                    <div><div style="font-size:11px;color:var(--text-muted);font-weight:600;">CREATED</div>{{ meeting.created_at|date:"d M Y, h:i A" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agenda -->
+        {% if meeting.agenda %}
+        <div class="card mb-4">
+            <div class="card-header"><h6 class="fw-700 mb-0"><i class="bi bi-list-check me-2" style="color:var(--accent);"></i>Agenda</h6></div>
+            <div class="card-body">
+                <div class="agenda-box">{{ meeting.agenda }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Right column -->
+    <div class="col-12 col-lg-4">
+
+        <!-- Actions -->
+        {% if meeting.status != 'cancelled' and meeting.status != 'completed' %}
+        <div class="card mb-4 p-3">
+            <h6 class="fw-700 mb-3" style="font-size:13px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Actions</h6>
+            <div class="d-flex flex-column gap-2">
+                <a href="{% url 'hr_edit_meeting' meeting.pk %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-pencil me-1"></i> Edit Meeting
+                </a>
+                <a href="{% url 'hr_cancel_meeting' meeting.pk %}" class="btn btn-warning btn-sm text-dark">
+                    <i class="bi bi-x-circle me-1"></i> Cancel Meeting
+                </a>
+                <a href="{% url 'hr_delete_meeting' meeting.pk %}" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-trash me-1"></i> Delete
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Attendees -->
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h6 class="fw-700 mb-0"><i class="bi bi-people-fill me-2" style="color:var(--accent);"></i>Attendees</h6>
+                <span class="badge" style="background:#e0f2fe;color:#075985;">{{ attendees.count }}</span>
+            </div>
+            <div class="card-body py-2">
+                <!-- RSVP summary -->
+                {% with acc=attendees|length %}
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <span class="rsvp-badge rsvp-accepted">✓ {{ attendees|dictsort:"rsvp"|length }} invited</span>
+                </div>
+                {% endwith %}
+                {% for ma in attendees %}
+                <div class="attendee-row">
+                    <div class="emp-avatar" style="width:34px;height:34px;font-size:12px;">
+                        {{ ma.employee.get_full_name|first|upper }}
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ ma.employee.get_full_name }}</div>
+                        <div style="font-size:11px;color:var(--text-muted);">{{ ma.employee.designation|default:"—" }}</div>
+                    </div>
+                    <span class="rsvp-badge rsvp-{{ ma.rsvp }}">{{ ma.get_rsvp_display }}</span>
+                </div>
+                {% empty %}
+                <p class="text-muted" style="font-size:13px;">No attendees.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

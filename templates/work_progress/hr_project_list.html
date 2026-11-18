@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block title %}Work Progress{% endblock %}
+{% block page_title %}Work Progress — Projects{% endblock %}
+{% block nav_work_progress %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.accuracy-bar { height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden; }
+.accuracy-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+.proj-card { border-radius: 14px; border: none; box-shadow: 0 2px 12px rgba(0,0,0,0.06); background: white; transition: transform 0.2s, box-shadow 0.2s; }
+.proj-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.status-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+.pill-todo { background:#f3f4f6; color:#374151; }
+.pill-open { background:#dbeafe; color:#1d4ed8; }
+.pill-review { background:#fef3c7; color:#92400e; }
+.pill-done { background:#dcfce7; color:#166534; }
+.pill-overdue { background:#fee2e2; color:#991b1b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-kanban-fill me-2" style="color:var(--accent)"></i>Work Progress</h4>
+        <p>Manage projects and track team tasks</p>
+    </div>
+    <a href="{% url 'hr_create_project' %}" class="btn btn-accent">
+        <i class="bi bi-plus-lg me-1"></i> New Project
+    </a>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-icon"><i class="bi bi-folder-fill"></i></div>
+            <div class="kpi-value">{{ total_projects }}</div>
+            <div class="kpi-label">Total Projects</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-teal">
+            <div class="kpi-icon"><i class="bi bi-list-task"></i></div>
+            <div class="kpi-value">{{ total_tasks }}</div>
+            <div class="kpi-label">Total Tasks</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-green">
+            <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
+            <div class="kpi-value">{{ total_done }}</div>
+            <div class="kpi-label">Completed</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-red">
+            <div class="kpi-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            <div class="kpi-value">{{ total_overdue }}</div>
+            <div class="kpi-label">Overdue Tasks</div>
+        </div>
+    </div>
+</div>
+
+{% if project_data %}
+<div class="row g-3">
+    {% for pd in project_data %}
+    <div class="col-12 col-lg-6">
+        <div class="proj-card p-0 overflow-hidden">
+            <div class="p-4 pb-3">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div>
+                        <h6 class="fw-bold mb-1" style="font-size:16px; color:var(--primary)">{{ pd.project.name }}</h6>
+                        {% if pd.project.description %}
+                        <p class="text-muted mb-0" style="font-size:12px;">{{ pd.project.description|truncatechars:80 }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-light" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'hr_project_detail' pd.project.pk %}"><i class="bi bi-eye me-2"></i>View Board</a></li>
+                            <li><a class="dropdown-item" href="{% url 'hr_edit_project' pd.project.pk %}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{% url 'hr_delete_project' pd.project.pk %}"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Date range -->
+                {% if pd.project.start_date or pd.project.end_date %}
+                <div class="mb-2" style="font-size:12px; color:var(--text-muted)">
+                    <i class="bi bi-calendar3 me-1"></i>
+                    {{ pd.project.start_date|default:"—" }} → {{ pd.project.end_date|default:"—" }}
+                </div>
+                {% endif %}
+
+                <!-- Status pills -->
+                <div class="d-flex flex-wrap gap-1 mb-3">
+                    <span class="status-pill pill-todo"><i class="bi bi-circle"></i> To Do: {{ pd.todo }}</span>
+                    <span class="status-pill pill-open"><i class="bi bi-arrow-right-circle"></i> Open: {{ pd.open }}</span>
+                    <span class="status-pill pill-review"><i class="bi bi-eye"></i> Review: {{ pd.under_review }}</span>
+                    <span class="status-pill pill-done"><i class="bi bi-check-circle"></i> Done: {{ pd.done }}</span>
+                    {% if pd.overdue > 0 %}
+                    <span class="status-pill pill-overdue"><i class="bi bi-exclamation-circle"></i> Overdue: {{ pd.overdue }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Accuracy -->
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span style="font-size:12px; color:var(--text-muted); font-weight:600;">On-Time Accuracy</span>
+                    <span style="font-size:13px; font-weight:700; color:{% if pd.accuracy >= 80 %}#059669{% elif pd.accuracy >= 50 %}#d97706{% else %}#dc2626{% endif %}">{{ pd.accuracy }}%</span>
+                </div>
+                <div class="accuracy-bar">
+                    <div class="accuracy-fill" style="width:{{ pd.accuracy }}%; background:{% if pd.accuracy >= 80 %}#22c55e{% elif pd.accuracy >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
+                </div>
+            </div>
+            <div class="px-4 py-2 d-flex align-items-center justify-content-between" style="background:#f8fafc; border-top:1px solid #f3f4f6;">
+                <span style="font-size:12px; color:var(--text-muted)">
+                    <i class="bi bi-people me-1"></i> {{ pd.members_count }} member{{ pd.members_count|pluralize }}
+                    &nbsp;·&nbsp;
+                    <i class="bi bi-list-task me-1"></i> {{ pd.total }} task{{ pd.total|pluralize }}
+                </span>
+                <a href="{% url 'hr_project_detail' pd.project.pk %}" class="btn btn-sm btn-accent" style="font-size:12px; padding:4px 12px;">
+                    View Board <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <div style="font-size:64px; color:#e5e7eb; margin-bottom:16px;"><i class="bi bi-kanban"></i></div>
+    <h5 style="color:var(--text-muted); font-weight:600;">No projects yet</h5>
+    <p style="color:var(--text-muted); font-size:14px;">Create your first project to start tracking work progress.</p>
+    <a href="{% url 'hr_create_project' %}" class="btn btn-accent mt-2">
+        <i class="bi bi-plus-lg me-1"></i> Create Project
+    </a>
+</div>
+{% endif %}
+{% endblock %}

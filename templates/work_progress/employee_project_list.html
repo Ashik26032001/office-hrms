@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}My Projects{% endblock %}
+{% block page_title %}My Work Projects{% endblock %}
+{% block nav_my_work %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.proj-card { border-radius:14px; border:none; box-shadow:0 2px 12px rgba(0,0,0,0.06); background:white; transition:transform 0.2s,box-shadow 0.2s; overflow:hidden; }
+.proj-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.1); }
+.status-mini { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-kanban-fill me-2" style="color:var(--accent)"></i>My Work Projects</h4>
+        <p>Projects you are assigned to</p>
+    </div>
+</div>
+
+{% if project_data %}
+<div class="row g-3">
+    {% for pd in project_data %}
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="proj-card">
+            <div class="p-4">
+                <h6 class="fw-bold mb-1" style="color:var(--primary);font-size:16px;">{{ pd.project.name }}</h6>
+                {% if pd.project.description %}
+                <p class="text-muted mb-2" style="font-size:12px;">{{ pd.project.description|truncatechars:70 }}</p>
+                {% endif %}
+                {% if pd.project.end_date %}
+                <div class="mb-2" style="font-size:12px;color:var(--text-muted);"><i class="bi bi-calendar3 me-1"></i>Due: {{ pd.project.end_date }}</div>
+                {% endif %}
+                <div class="d-flex flex-wrap gap-1 mb-3">
+                    <span class="status-mini" style="background:#f3f4f6;color:#374151;"><i class="bi bi-circle"></i> {{ pd.my_todo }}</span>
+                    <span class="status-mini" style="background:#dbeafe;color:#1d4ed8;"><i class="bi bi-arrow-right-circle"></i> {{ pd.my_open }}</span>
+                    <span class="status-mini" style="background:#fef3c7;color:#92400e;"><i class="bi bi-eye"></i> {{ pd.my_review }}</span>
+                    <span class="status-mini" style="background:#dcfce7;color:#166534;"><i class="bi bi-check-circle"></i> {{ pd.my_done }}</span>
+                    {% if pd.overdue > 0 %}<span class="status-mini" style="background:#fee2e2;color:#991b1b;"><i class="bi bi-exclamation-circle"></i> {{ pd.overdue }} overdue</span>{% endif %}
+                </div>
+            </div>
+            <div class="px-4 pb-4">
+                <a href="{% url 'employee_kanban' pd.project.pk %}" class="btn btn-accent w-100">
+                    <i class="bi bi-kanban me-1"></i> Open Board
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <div style="font-size:64px;color:#e5e7eb;margin-bottom:16px;"><i class="bi bi-kanban"></i></div>
+    <h5 style="color:var(--text-muted);font-weight:600;">No projects assigned</h5>
+    <p style="color:var(--text-muted);font-size:14px;">You haven't been added to any project yet. Contact your HR.</p>
+</div>
+{% endif %}
+{% endblock %}

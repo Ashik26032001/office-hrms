@@ -22,6 +22,9 @@ INSTALLED_APPS = [
     'attendance',
     'dashboard',
     'reports',
+    'work_progress',
+    'meetings',
+    'ai_assistant',
 ]
 
 MIDDLEWARE = [

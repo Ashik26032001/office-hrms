@@ -277,17 +277,20 @@ def attendance_log(request):
         )
 
     all_today_status = get_all_today_status()
-    present_count = sum(1 for e in all_today_status if e['is_present'])
-    in_count      = sum(1 for e in all_today_status if e['live_status'] == 'IN')
+    total_employees  = Employee.objects.filter(status='active').count()
+    present_count    = sum(1 for e in all_today_status if e['is_present'])
+    in_count         = sum(1 for e in all_today_status if e['live_status'] == 'IN')
+    absent_count     = max(0, total_employees - present_count)
 
     context = {
-        'events':          events,
-        'filter_date':     filter_date,
-        'emp_filter':      emp_filter,
+        'events':           events,
+        'filter_date':      filter_date,
+        'emp_filter':       emp_filter,
         'all_today_status': all_today_status,
-        'present_count':   present_count,
-        'in_count':        in_count,
-        'total_employees': Employee.objects.filter(status='active').count(),
+        'present_count':    present_count,
+        'in_count':         in_count,
+        'absent_count':     absent_count,
+        'total_employees':  total_employees,
     }
     return render(request, 'attendance/attendance_log.html', context)
 

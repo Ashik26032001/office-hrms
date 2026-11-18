@@ -1,0 +1,33 @@
+<div class="task-card priority-{{ task.priority }}{% if task.is_overdue %} overdue-card{% endif %}"
+     draggable="true"
+     data-task-id="{{ task.pk }}"
+     data-current-col="col-{{ task.status }}">
+    <div class="task-actions">
+        <button class="task-action-btn btn-edit-task" data-task-id="{{ task.pk }}" title="Edit">
+            <i class="bi bi-pencil-fill"></i>
+        </button>
+        <button class="task-action-btn btn-del-task" data-task-id="{{ task.pk }}" title="Delete">
+            <i class="bi bi-trash-fill"></i>
+        </button>
+    </div>
+    <div class="task-title">{{ task.title }}</div>
+    {% if task.description %}
+    <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; line-height:1.4;">{{ task.description|truncatechars:60 }}</div>
+    {% endif %}
+    <div class="task-meta">
+        <span class="task-tag tag-{{ task.priority }}">{{ task.get_priority_display }}</span>
+        {% if task.assigned_to %}
+        <span class="task-tag" style="background:#f3f4f6; color:#374151;">
+            <i class="bi bi-person-fill me-1"></i>{{ task.assigned_to.get_full_name }}
+        </span>
+        {% endif %}
+        {% if task.end_date %}
+        <span class="task-tag tag-date">
+            <i class="bi bi-calendar me-1"></i>{{ task.end_date }}
+        </span>
+        {% endif %}
+        {% if task.is_overdue %}
+        <span class="task-tag tag-overdue"><i class="bi bi-exclamation-circle me-1"></i>Overdue</span>
+        {% endif %}
+    </div>
+</div>

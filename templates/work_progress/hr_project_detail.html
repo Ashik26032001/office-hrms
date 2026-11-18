@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}{{ project.name }}{% endblock %}
+{% block page_title %}{{ project.name }}{% endblock %}
+{% block nav_work_progress %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.kanban-col { min-width: 240px; border-radius: 12px; padding: 16px; background: #f8fafc; border: 1.5px solid #e5e7eb; }
+.kanban-col-header { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.kanban-task-card { background:white; border-radius:10px; padding:12px 14px; margin-bottom:10px; box-shadow:0 1px 6px rgba(0,0,0,0.06); border-left: 3px solid transparent; }
+.kanban-task-card.priority-high { border-left-color:#ef4444; }
+.kanban-task-card.priority-medium { border-left-color:#f59e0b; }
+.kanban-task-card.priority-low { border-left-color:#22c55e; }
+.kanban-wrap { display:flex; gap:16px; overflow-x:auto; padding-bottom:16px; }
+.badge-todo { background:#f3f4f6; color:#374151; }
+.badge-open { background:#dbeafe; color:#1d4ed8; }
+.badge-review { background:#fef3c7; color:#92400e; }
+.badge-done { background:#dcfce7; color:#166534; }
+.overdue-tag { background:#fee2e2; color:#991b1b; font-size:10px; border-radius:4px; padding:2px 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-kanban-fill me-2" style="color:var(--accent)"></i>{{ project.name }}</h4>
+        <p>
+            {% if project.start_date or project.end_date %}
+            <i class="bi bi-calendar3 me-1"></i>{{ project.start_date|default:"—" }} → {{ project.end_date|default:"—" }}
+            &nbsp;·&nbsp;
+            {% endif %}
+            <i class="bi bi-people me-1"></i>{{ project.members.count }} member{{ project.members.count|pluralize }}
+            &nbsp;·&nbsp; On-Time Accuracy:
+            <strong style="color:{% if accuracy >= 80 %}#059669{% elif accuracy >= 50 %}#d97706{% else %}#dc2626{% endif %}">{{ accuracy }}%</strong>
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'hr_edit_project' project.pk %}" class="btn btn-light btn-sm"><i class="bi bi-pencil me-1"></i> Edit</a>
+        <a href="{% url 'hr_project_list' %}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i> Back</a>
+    </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card p-3 text-center">
+            <div style="font-size:24px; font-weight:700; color:#374151;">{{ todo_tasks.count }}</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase;">To Do</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 text-center">
+            <div style="font-size:24px; font-weight:700; color:#1d4ed8;">{{ open_tasks.count }}</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Open</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 text-center">
+            <div style="font-size:24px; font-weight:700; color:#92400e;">{{ review_tasks.count }}</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Under Review</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 text-center">
+            <div style="font-size:24px; font-weight:700; color:#059669;">{{ done_tasks.count }}</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Done</div>
+        </div>
+    </div>
+</div>
+
+<!-- Kanban Board (read-only for HR) -->
+<div class="card p-4 mb-4">
+    <h6 class="fw-bold mb-3"><i class="bi bi-kanban me-2"></i>Board Overview</h6>
+    <div class="kanban-wrap">
+        <!-- To Do -->
+        <div class="kanban-col" style="flex:1; min-width:220px;">
+            <div class="kanban-col-header">
+                <span style="width:10px;height:10px;border-radius:50%;background:#9ca3af;display:inline-block;"></span>
+                To Do
+                <span class="badge badge-todo ms-auto">{{ todo_tasks.count }}</span>
+            </div>
+            {% for task in todo_tasks %}
+            <div class="kanban-task-card priority-{{ task.priority }}">
+                <div class="fw-semibold mb-1" style="font-size:13px;">{{ task.title }}</div>
+                {% if task.assigned_to %}<div style="font-size:11px;color:var(--text-muted);"><i class="bi bi-person me-1"></i>{{ task.assigned_to.get_full_name }}</div>{% endif %}
+                {% if task.end_date %}<div style="font-size:11px;color:var(--text-muted);" class="mt-1"><i class="bi bi-calendar me-1"></i>{{ task.end_date }}{% if task.is_overdue %} <span class="overdue-tag">OVERDUE</span>{% endif %}</div>{% endif %}
+                <span class="badge mt-1" style="font-size:10px; background:#fef3c7; color:#92400e;">{{ task.get_priority_display }}</span>
+            </div>
+            {% empty %}<p style="font-size:12px;color:var(--text-muted);">No tasks</p>{% endfor %}
+        </div>
+        <!-- Open -->
+        <div class="kanban-col" style="flex:1; min-width:220px;">
+            <div class="kanban-col-header">
+                <span style="width:10px;height:10px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>
+                Open
+                <span class="badge badge-open ms-auto">{{ open_tasks.count }}</span>
+            </div>
+            {% for task in open_tasks %}
+            <div class="kanban-task-card priority-{{ task.priority }}">
+                <div class="fw-semibold mb-1" style="font-size:13px;">{{ task.title }}</div>
+                {% if task.assigned_to %}<div style="font-size:11px;color:var(--text-muted);"><i class="bi bi-person me-1"></i>{{ task.assigned_to.get_full_name }}</div>{% endif %}
+                {% if task.end_date %}<div style="font-size:11px;color:var(--text-muted);" class="mt-1"><i class="bi bi-calendar me-1"></i>{{ task.end_date }}{% if task.is_overdue %} <span class="overdue-tag">OVERDUE</span>{% endif %}</div>{% endif %}
+                <span class="badge mt-1" style="font-size:10px; background:#fef3c7; color:#92400e;">{{ task.get_priority_display }}</span>
+            </div>
+            {% empty %}<p style="font-size:12px;color:var(--text-muted);">No tasks</p>{% endfor %}
+        </div>
+        <!-- Under Review -->
+        <div class="kanban-col" style="flex:1; min-width:220px;">
+            <div class="kanban-col-header">
+                <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>
+                Under Review
+                <span class="badge badge-review ms-auto">{{ review_tasks.count }}</span>
+            </div>
+            {% for task in review_tasks %}
+            <div class="kanban-task-card priority-{{ task.priority }}">
+                <div class="fw-semibold mb-1" style="font-size:13px;">{{ task.title }}</div>
+                {% if task.assigned_to %}<div style="font-size:11px;color:var(--text-muted);"><i class="bi bi-person me-1"></i>{{ task.assigned_to.get_full_name }}</div>{% endif %}
+                {% if task.end_date %}<div style="font-size:11px;color:var(--text-muted);" class="mt-1"><i class="bi bi-calendar me-1"></i>{{ task.end_date }}{% if task.is_overdue %} <span class="overdue-tag">OVERDUE</span>{% endif %}</div>{% endif %}
+                <span class="badge mt-1" style="font-size:10px; background:#fef3c7; color:#92400e;">{{ task.get_priority_display }}</span>
+            </div>
+            {% empty %}<p style="font-size:12px;color:var(--text-muted);">No tasks</p>{% endfor %}
+        </div>
+        <!-- Done -->
+        <div class="kanban-col" style="flex:1; min-width:220px;">
+            <div class="kanban-col-header">
+                <span style="width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+                Done
+                <span class="badge badge-done ms-auto">{{ done_tasks.count }}</span>
+            </div>
+            {% for task in done_tasks %}
+            <div class="kanban-task-card priority-{{ task.priority }}">
+                <div class="fw-semibold mb-1" style="font-size:13px;">{{ task.title }}</div>
+                {% if task.assigned_to %}<div style="font-size:11px;color:var(--text-muted);"><i class="bi bi-person me-1"></i>{{ task.assigned_to.get_full_name }}</div>{% endif %}
+                {% if task.end_date %}<div style="font-size:11px;color:var(--text-muted);" class="mt-1"><i class="bi bi-calendar me-1"></i>{{ task.end_date }}</div>{% endif %}
+                <span class="badge mt-1" style="font-size:10px; background:#fef3c7; color:#92400e;">{{ task.get_priority_display }}</span>
+            </div>
+            {% empty %}<p style="font-size:12px;color:var(--text-muted);">No tasks</p>{% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- All Tasks Table -->
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="fw-bold mb-0"><i class="bi bi-table me-2"></i>All Tasks</h6>
+        <span class="badge" style="background:#e0f2fe;color:#075985;font-size:12px;">{{ tasks.count }} tasks</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-modern mb-0">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Assigned To</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold" style="font-size:13px;">{{ task.title }}</div>
+                            {% if task.description %}<div style="font-size:11px;color:var(--text-muted);">{{ task.description|truncatechars:50 }}</div>{% endif %}
+                        </td>
+                        <td>
+                            {% if task.assigned_to %}
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="emp-avatar" style="width:28px;height:28px;font-size:11px;">{{ task.assigned_to.get_full_name|first|upper }}</div>
+                                <span style="font-size:12px;">{{ task.assigned_to.get_full_name }}</span>
+                            </div>
+                            {% else %}<span style="color:var(--text-muted);font-size:12px;">Unassigned</span>{% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ task.priority_color }}">{{ task.get_priority_display }}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-{{ task.status }}" style="font-size:11px;">{{ task.get_status_display }}</span>
+                        </td>
+                        <td style="font-size:12px;">{{ task.start_date|default:"—" }}</td>
+                        <td style="font-size:12px;">
+                            {{ task.end_date|default:"—" }}
+                            {% if task.is_overdue %}<br><span class="overdue-tag">OVERDUE</span>{% endif %}
+                        </td>
+                        <td style="font-size:12px;">{{ task.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-center py-4" style="color:var(--text-muted);">No tasks in this project.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+{% block title %}{{ action }} Meeting{% endblock %}
+{% block page_title %}{{ action }} Meeting{% endblock %}
+{% block nav_meetings %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    background: white; border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    padding: 28px 32px; margin-bottom: 20px;
+}
+.form-section-title {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--accent);
+    margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+    padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;
+}
+.employee-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;
+}
+.emp-check-card {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border: 1.5px solid #e5e7eb;
+    border-radius: 10px; cursor: pointer; transition: all 0.2s;
+    background: white;
+}
+.emp-check-card:hover { border-color: var(--accent); background: #f0fdff; }
+.emp-check-card input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.emp-check-card.selected { border-color: var(--accent); background: #e0f7fe; }
+.emp-avatar-sm {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #1e3a5f, #00b4d8);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.preview-box {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0077b6 100%);
+    border-radius: 16px; padding: 24px; color: white;
+    position: sticky; top: 90px;
+}
+.preview-box h6 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; margin-bottom: 4px; }
+.preview-box p { font-size: 14px; font-weight: 600; margin-bottom: 14px; opacity: 0.95; }
+.preview-row { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: 0.85; margin-bottom: 8px; }
+
+.type-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.type-opt {
+    border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 10px 8px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+}
+.type-opt:hover { border-color: var(--accent); }
+.type-opt.selected { border-color: var(--accent); background: #e0f7fe; }
+.type-opt input { display: none; }
+.type-opt-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+.type-opt-label { font-size: 11px; font-weight: 600; color: #374151; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h4><i class="bi bi-calendar-plus-fill me-2" style="color:var(--accent)"></i>{{ action }} Meeting</h4>
+        <p>Fill in the details to {{ action|lower }} a meeting</p>
+    </div>
+    <a href="{% url 'hr_meeting_list' %}" class="btn btn-light"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+<form method="post" id="meetingForm">
+    {% csrf_token %}
+    <div class="row g-4">
+        <div class="col-12 col-lg-8">
+
+            <!-- Basic Info -->
+            <div class="form-section">
+                <div class="form-section-title"><i class="bi bi-info-circle-fill"></i> Meeting Details</div>
+                <div class="mb-3">
+                    <label class="form-label fw-600">Meeting Title <span class="text-danger">*</span></label>
+                    {{ form.title }}
+                    {% if form.title.errors %}<div class="text-danger" style="font-size:12px;">{{ form.title.errors.0 }}</div>{% endif %}
+                </div>
+
+                <!-- Meeting Type -->
+                <div class="mb-3">
+                    <label class="form-label fw-600 d-block">Meeting Type</label>
+                    <div class="type-selector" id="typeSelector">
+                        {% for val, lbl in form.fields.meeting_type.choices %}
+                        <label class="type-opt {% if form.meeting_type.value == val %}selected{% endif %}">
+                            <input type="radio" name="meeting_type" value="{{ val }}" {% if form.meeting_type.value == val or forloop.first and not form.meeting_type.value %}checked{% endif %}>
+                            <span class="type-opt-icon">
+                                {% if val == 'internal' %}👥{% elif val == 'client' %}💼{% elif val == 'standup' %}⚡{% elif val == 'review' %}📋{% elif val == 'interview' %}🎯{% else %}📅{% endif %}
+                            </span>
+                            <span class="type-opt-label">{{ lbl }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-600">Description</label>
+                    {{ form.description }}
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-600">Agenda <span style="font-size:11px;color:var(--text-muted);">(optional)</span></label>
+                    {{ form.agenda }}
+                </div>
+            </div>
+
+            <!-- Schedule -->
+            <div class="form-section">
+                <div class="form-section-title"><i class="bi bi-clock-fill"></i> Schedule</div>
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label class="form-label fw-600">Date & Time <span class="text-danger">*</span></label>
+                        {{ form.scheduled_at }}
+                        {% if form.scheduled_at.errors %}<div class="text-danger" style="font-size:12px;">{{ form.scheduled_at.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label fw-600">Duration (minutes)</label>
+                        {{ form.duration_mins }}
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Common: 15, 30, 60, 90 mins</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location / Link -->
+            <div class="form-section">
+                <div class="form-section-title"><i class="bi bi-geo-alt-fill"></i> Location & Link</div>
+                <div class="mb-3">
+                    <label class="form-label fw-600">
+                        <i class="bi bi-camera-video-fill me-1" style="color:#0077b6;"></i>
+                        Meeting Link
+                    </label>
+                    {{ form.meeting_link }}
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                        Paste a Zoom, Google Meet, Microsoft Teams, or any video conference link.
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-600">
+                        <i class="bi bi-building me-1" style="color:#0077b6;"></i>
+                        Physical Location
+                    </label>
+                    {{ form.location }}
+                </div>
+            </div>
+
+            <!-- Attendees -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <i class="bi bi-people-fill"></i> Invite Employees
+                    <span class="ms-auto" style="font-size:11px;color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">
+                        <span id="selectedCount">0</span> selected
+                    </span>
+                </div>
+
+                <!-- Search filter -->
+                <div class="mb-3">
+                    <input type="text" id="empSearch" class="form-control" placeholder="🔍 Search employees…" style="font-size:13px;">
+                </div>
+
+                <div class="employee-grid" id="employeeGrid">
+                    {% for emp in employees %}
+                    <label class="emp-check-card" id="emp-card-{{ emp.pk }}">
+                        <input type="checkbox" name="attendees" value="{{ emp.pk }}"
+                               {% for sel in form.initial.attendees %}{% if sel.pk == emp.pk %}checked{% endif %}{% endfor %}
+                               onchange="updateSelected()">
+                        <div class="emp-avatar-sm">{{ emp.get_full_name|first|upper }}</div>
+                        <div style="min-width:0;">
+                            <div style="font-size:13px;font-weight:600;color:#1a2535;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ emp.get_full_name }}</div>
+                            <div style="font-size:11px;color:var(--text-muted);">{{ emp.designation|default:emp.department }}</div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% if form.attendees.errors %}<div class="text-danger mt-2" style="font-size:12px;">{{ form.attendees.errors.0 }}</div>{% endif %}
+
+                <div class="mt-2 d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-light" onclick="selectAll()">Select All</button>
+                    <button type="button" class="btn btn-sm btn-light" onclick="clearAll()">Clear All</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Preview / Sidebar -->
+        <div class="col-12 col-lg-4">
+            <div class="preview-box mb-3">
+                <h6>Meeting Preview</h6>
+                <p id="prevTitle" style="font-size:17px;">Untitled Meeting</p>
+                <div class="preview-row"><i class="bi bi-calendar3"></i> <span id="prevDate">—</span></div>
+                <div class="preview-row"><i class="bi bi-clock"></i> <span id="prevTime">—</span></div>
+                <div class="preview-row"><i class="bi bi-hourglass-split"></i> <span id="prevDuration">60 min</span></div>
+                <div class="preview-row"><i class="bi bi-camera-video-fill"></i> <span id="prevLink">No link set</span></div>
+                <div class="preview-row"><i class="bi bi-people-fill"></i> <span id="prevAttendees">0 invited</span></div>
+                <hr style="border-color:rgba(255,255,255,0.2);">
+                <div style="font-size:11px;opacity:0.6;">Attendees will receive an in-app notification immediately after scheduling, and a 5-minute reminder before the meeting starts.</div>
+            </div>
+
+            <div class="card p-3 mb-3">
+                <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;"><i class="bi bi-bell-fill me-1"></i> Notification Behaviour</div>
+                <div class="d-flex flex-column gap-2">
+                    <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;align-items:flex-start;">
+                        <span style="color:#059669;font-size:14px;">✔</span> Instant invite notification to all attendees
+                    </div>
+                    <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;align-items:flex-start;">
+                        <span style="color:#059669;font-size:14px;">✔</span> Auto 5-min reminder before start time
+                    </div>
+                    <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;align-items:flex-start;">
+                        <span style="color:#059669;font-size:14px;">✔</span> Update / cancellation alerts on changes
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-accent w-100 py-3" style="font-size:15px;font-weight:700;border-radius:12px;">
+                <i class="bi bi-calendar-check-fill me-2"></i> {{ action }} Meeting
+            </button>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Type selector
+document.querySelectorAll('.type-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+        document.querySelectorAll('.type-opt').forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+    });
+});
+
+// Live preview update
+function updatePreview() {
+    document.getElementById('prevTitle').textContent =
+        document.querySelector('[name=title]').value || 'Untitled Meeting';
+    const dtVal = document.querySelector('[name=scheduled_at]').value;
+    if (dtVal) {
+        const dt = new Date(dtVal);
+        document.getElementById('prevDate').textContent =
+            dt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+        document.getElementById('prevTime').textContent =
+            dt.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+    }
+    const dur = document.querySelector('[name=duration_mins]').value;
+    document.getElementById('prevDuration').textContent = (dur || 60) + ' min';
+    const link = document.querySelector('[name=meeting_link]').value;
+    document.getElementById('prevLink').textContent = link ? 'Link set ✓' : 'No link set';
+    updateSelected();
+}
+
+function updateSelected() {
+    const count = document.querySelectorAll('[name=attendees]:checked').length;
+    document.getElementById('selectedCount').textContent = count;
+    document.getElementById('prevAttendees').textContent = count + ' invited';
+    document.querySelectorAll('.emp-check-card').forEach(card => {
+        const cb = card.querySelector('input[type=checkbox]');
+        card.classList.toggle('selected', cb.checked);
+    });
+}
+
+document.querySelectorAll('[name=title],[name=scheduled_at],[name=duration_mins],[name=meeting_link]')
+    .forEach(el => el.addEventListener('input', updatePreview));
+
+// Employee search
+document.getElementById('empSearch').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.emp-check-card').forEach(card => {
+        card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+});
+
+function selectAll() {
+    document.querySelectorAll('[name=attendees]').forEach(cb => cb.checked = true);
+    updateSelected();
+}
+function clearAll() {
+    document.querySelectorAll('[name=attendees]').forEach(cb => cb.checked = false);
+    updateSelected();
+}
+
+// Init
+updateSelected();
+updatePreview();
+</script>
+{% endblock %}
